@@ -186,22 +186,23 @@ type PaasServerDTO struct {
 
 // PaasAppDTO 应用响应结构。
 type PaasAppDTO struct {
-	ID            string   `json:"id"`
-	ServerID      string   `json:"server_id"`
-	ServerName    string   `json:"server_name"`
-	Name          string   `json:"name"`
-	Image         string   `json:"image"`
-	SourceRepo    string   `json:"source_repo"`
-	SourceBranch  string   `json:"source_branch"`
-	ContainerPort int      `json:"container_port"`
-	HostPort      int      `json:"host_port"`
-	Env           []string `json:"env"`
-	Volumes       []string `json:"volumes"`
-	Restart       string   `json:"restart"`
-	ContainerID   string   `json:"container_id"`
-	Status        int      `json:"status"`
-	LastError     string   `json:"last_error"`
-	CreatedAt     string   `json:"created_at"`
+	ID              string   `json:"id"`
+	ServerID        string   `json:"server_id"`
+	ServerName      string   `json:"server_name"`
+	Name            string   `json:"name"`
+	Image           string   `json:"image"`
+	SourceRepo      string   `json:"source_repo"`
+	SourceBranch    string   `json:"source_branch"`
+	SourceAccountID uint64   `json:"source_account_id"`
+	ContainerPort   int      `json:"container_port"`
+	HostPort        int      `json:"host_port"`
+	Env             []string `json:"env"`
+	Volumes         []string `json:"volumes"`
+	Restart         string   `json:"restart"`
+	ContainerID     string   `json:"container_id"`
+	Status          int      `json:"status"`
+	LastError       string   `json:"last_error"`
+	CreatedAt       string   `json:"created_at"`
 }
 
 // PaasDomainDTO 域名响应结构。

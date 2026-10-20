@@ -79,7 +79,7 @@ func newPaasTestService(t *testing.T) (*PaasService, *fakeExec, *gorm.DB) {
 		repository.NewPaasServerRepository(db),
 		repository.NewPaasAppRepository(db),
 		repository.NewPaasDomainRepository(db),
-		repository.NewPaasSettingRepository(db),
+		repository.NewPaasGitHubAccountRepository(db),
 		"test-aes-key", "", "",
 		slog.New(slog.NewTextHandler(io.Discard, nil)),
 	)
@@ -390,5 +390,66 @@ func TestPaasGitHubBuildScript(t *testing.T) {
 		ServerID: u64str(srv.ID), Name: "none", ContainerPort: 80, HostPort: 2,
 	}); err == nil {
 		t.Fatalf("镜像与仓库都为空应被拒绝")
+	}
+}
+
+func TestPaasGitHubAccounts(t *testing.T) {
+	svc, _, _ := newPaasTestService(t)
+	// 两个账号，第一个自动成为默认
+	for i, login := range []string{"alice", "bob"} {
+		encrypted, err := secretbox.Encrypt("test-aes-key", "token-"+login)
+		if err != nil {
+			t.Fatalf("encrypt: %v", err)
+		}
+		if err := svc.accounts.Upsert(&model.PaasGitHubAccount{
+			Login: login, Token: encrypted, IsDefault: i == 0,
+		}); err != nil {
+			t.Fatalf("upsert: %v", err)
+		}
+	}
+	status, err := svc.GitHubStatus()
+	if err != nil {
+		t.Fatalf("status: %v", err)
+	}
+	if len(status.Accounts) != 2 || status.Accounts[0].Login != "alice" || !status.Accounts[0].IsDefault {
+		t.Fatalf("账号列表或默认标记不正确: %+v", status.Accounts)
+	}
+
+	// 指定 bob 账号解析 token
+	accounts, _ := svc.accounts.List()
+	var bobID uint64
+	for _, a := range accounts {
+		if a.Login == "bob" {
+			bobID = a.ID
+		}
+	}
+	token, login, err := svc.resolveGitHubToken(bobID)
+	if err != nil || token != "token-bob" || login != "bob" {
+		t.Fatalf("指定账号解析失败: %v %s %s", err, token, login)
+	}
+	// 不指定时用默认账号
+	token, login, _ = svc.resolveGitHubToken(0)
+	if token != "token-alice" || login != "alice" {
+		t.Fatalf("默认账号解析失败: %s %s", token, login)
+	}
+
+	// 设默认 + 删除默认后自动转移
+	if err := svc.GitHubSetDefault(bobID); err != nil {
+		t.Fatalf("set default: %v", err)
+	}
+	token, login, _ = svc.resolveGitHubToken(0)
+	if login != "bob" {
+		t.Fatalf("默认应为 bob: %s", login)
+	}
+	if err := svc.GitHubDeleteAccount(bobID); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	token, login, _ = svc.resolveGitHubToken(0)
+	if login != "alice" {
+		t.Fatalf("删除默认账号后应转移给 alice: %s", login)
+	}
+	// 已删账号的引用应报错
+	if _, _, err := svc.resolveGitHubToken(bobID); err == nil {
+		t.Fatalf("引用已删账号应报错")
 	}
 }

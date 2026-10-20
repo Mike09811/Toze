@@ -25,6 +25,13 @@
         "icon": "md-globe",
         "id": "1000063",
         "header": "home"
+      },
+      {
+        "title": "系统设置",
+        "path": "/paas/setting",
+        "icon": "md-settings",
+        "id": "1000064",
+        "header": "home"
       }
     ]
   },

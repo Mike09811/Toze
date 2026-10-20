@@ -66,16 +66,13 @@
             :loading="modal.submitting"
             @on-ok="handleSubmit"
         >
-            <Alert v-if="form.sourceType === 'github' && !github.connected" type="warning" show-icon class="ivu-mb-16">
+            <Alert v-if="form.sourceType === 'github' && accounts.length === 0" type="warning" show-icon class="ivu-mb-16">
                 <template #desc>
-                    未连接 GitHub：可直接构建公开仓库；构建私有仓库需先
-                    <a @click="handleGitHubAuth">一键授权 GitHub</a>。
+                    尚未授权 GitHub 账号：可直接构建公开仓库；私有仓库请先到
+                    <router-link to="/paas/setting">系统设置</router-link>
+                    授权。
                 </template>
             </Alert>
-            <div v-if="form.sourceType === 'github' && github.connected" class="ivu-mb-16">
-                <Tag color="green">GitHub 已连接：{{ github.login }}</Tag>
-                <a class="page-paas-danger" @click="handleGitHubDisconnect">断开</a>
-            </div>
             <Form :model="form" :rules="rules" ref="appForm" label-position="top">
                 <FormItem prop="server_id" label="所属服务器">
                     <Select v-model="form.server_id" placeholder="选择纳管的服务器">
@@ -105,7 +102,16 @@
                     </Col>
                 </Row>
                 <Row :gutter="16" v-if="form.sourceType === 'github'">
-                    <Col span="16">
+                    <Col span="8">
+                        <FormItem label="GitHub 账号">
+                            <Select v-model="form.source_account_id" placeholder="默认账号" clearable @on-change="handleAccountChange">
+                                <Option v-for="item in accounts" :key="item.id" :value="item.id">
+                                    {{ item.login }}{{ item.is_default ? '（默认）' : '' }}
+                                </Option>
+                            </Select>
+                        </FormItem>
+                    </Col>
+                    <Col span="10">
                         <FormItem prop="source_repo" label="GitHub 仓库">
                             <Select v-model="form.source_repo" filterable placeholder="选择仓库，或直接输入 owner/repo" @on-open-change="handleRepoDropdownOpen">
                                 <Option v-for="item in repos" :key="item.full_name" :value="item.full_name">
@@ -114,7 +120,7 @@
                             </Select>
                         </FormItem>
                     </Col>
-                    <Col span="8">
+                    <Col span="6">
                         <FormItem prop="source_branch" label="分支">
                             <Input v-model="form.source_branch" placeholder="默认 main" />
                         </FormItem>
@@ -160,7 +166,7 @@
     </div>
 </template>
 <script>
-    import { GetPaasAppList, CreatePaasApp, UpdatePaasApp, DeletePaasApp, DeployPaasApp, StartPaasApp, StopPaasApp, RestartPaasApp, GetPaasAppLogs, RefreshPaasAppStatus, GetPaasServerList, GetPaasGitHubStatus, GetPaasGitHubAuthURL, GetPaasGitHubRepos, DisconnectPaasGitHub } from '@api/paas';
+    import { GetPaasAppList, CreatePaasApp, UpdatePaasApp, DeletePaasApp, DeployPaasApp, StartPaasApp, StopPaasApp, RestartPaasApp, GetPaasAppLogs, RefreshPaasAppStatus, GetPaasServerList, GetPaasGitHubStatus, GetPaasGitHubRepos } from '@api/paas';
 
     export default {
         name: 'paas-app',
@@ -216,11 +222,7 @@
                     content: '',
                     loading: false
                 },
-                github: {
-                    connected: false,
-                    login: '',
-                    oauthConfigured: false
-                },
+                accounts: [],
                 repos: [],
                 reposLoaded: false,
                 pollTimer: null
@@ -236,6 +238,7 @@
                     image: '',
                     source_repo: '',
                     source_branch: 'main',
+                    source_account_id: 0,
                     container_port: 80,
                     host_port: 8080,
                     restart: 'always',
@@ -292,6 +295,7 @@
                     image: row.image,
                     source_repo: row.source_repo || '',
                     source_branch: row.source_branch || 'main',
+                    source_account_id: row.source_account_id || 0,
                     container_port: row.container_port,
                     host_port: row.host_port,
                     restart: row.restart || 'always',
@@ -314,6 +318,7 @@
                         image: this.form.sourceType === 'image' ? this.form.image : '',
                         source_repo: this.form.sourceType === 'github' ? this.form.source_repo : '',
                         source_branch: this.form.sourceType === 'github' ? this.form.source_branch : '',
+                        source_account_id: this.form.sourceType === 'github' ? this.form.source_account_id : 0,
                         container_port: this.form.container_port,
                         host_port: this.form.host_port,
                         restart: this.form.restart,
@@ -371,29 +376,16 @@
             },
             loadGitHubStatus () {
                 GetPaasGitHubStatus().then(res => {
-                    this.github = res;
+                    this.accounts = res.accounts || [];
                 });
             },
-            handleGitHubAuth () {
-                GetPaasGitHubAuthURL().then(res => {
-                    window.location.href = res.url;
-                });
-            },
-            handleGitHubDisconnect () {
-                this.$Modal.confirm({
-                    title: '断开确认',
-                    content: '断开后将无法构建私有仓库，确定继续？',
-                    onOk: () => {
-                        DisconnectPaasGitHub().then(() => {
-                            this.$Message.success('已断开 GitHub 授权');
-                            this.loadGitHubStatus();
-                        });
-                    }
-                });
+            handleAccountChange () {
+                this.repos = [];
+                this.reposLoaded = false;
             },
             handleRepoDropdownOpen (open) {
-                if (open && !this.reposLoaded) {
-                    GetPaasGitHubRepos().then(res => {
+                if (open && !this.reposLoaded && this.accounts.length > 0) {
+                    GetPaasGitHubRepos({ account_id: this.form.source_account_id || '' }).then(res => {
                         this.repos = res || [];
                         this.reposLoaded = true;
                     });
@@ -416,9 +408,7 @@
             this.getData();
             this.loadServers();
             this.loadGitHubStatus();
-            if (this.$route.query.github === 'ok') {
-                this.$Message.success('GitHub 授权成功');
-            }
+
         },
         beforeUnmount () {
             if (this.pollTimer) clearInterval(this.pollTimer);

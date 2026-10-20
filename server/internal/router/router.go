@@ -126,7 +126,8 @@ func New(d Deps) *gin.Engine {
 
 			admin.POST("/paas/github/auth/url", d.Handler.Paas.GitHubAuthURL)
 			admin.POST("/paas/github/repos", d.Handler.Paas.GitHubRepos)
-			admin.POST("/paas/github/disconnect", d.Handler.Paas.GitHubDisconnect)
+			admin.POST("/paas/github/accounts/default", d.Handler.Paas.GitHubSetDefault)
+			admin.POST("/paas/github/accounts/delete", d.Handler.Paas.GitHubDeleteAccount)
 		}
 	}
 

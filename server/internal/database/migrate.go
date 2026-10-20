@@ -20,7 +20,7 @@ func Migrate(db *gorm.DB) error {
 		&model.PaasServer{},
 		&model.PaasApp{},
 		&model.PaasDomain{},
-		&model.PaasSetting{},
+		&model.PaasGitHubAccount{},
 	); err != nil {
 		return fmt.Errorf("auto migrate: %w", err)
 	}

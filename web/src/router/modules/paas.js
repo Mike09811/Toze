@@ -41,6 +41,15 @@ export default {
                 title: '域名管理'
             },
             component: () => import('@/pages/paas/domain')
+        },
+        {
+            path: 'setting',
+            name: `${pre}setting`,
+            meta: {
+                ...meta,
+                title: '系统设置'
+            },
+            component: () => import('@/pages/paas/setting')
         }
     ]
 };

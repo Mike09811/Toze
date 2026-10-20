@@ -71,7 +71,7 @@ func main() {
 	paasServerRepo := repository.NewPaasServerRepository(db)
 	paasAppRepo := repository.NewPaasAppRepository(db)
 	paasDomainRepo := repository.NewPaasDomainRepository(db)
-	paasSettingRepo := repository.NewPaasSettingRepository(db)
+	paasGitHubAccountRepo := repository.NewPaasGitHubAccountRepository(db)
 
 	authSvc := service.NewAuthService(userRepo, roleRepo, tokenRepo, jwtMgr, log)
 	userSvc := service.NewUserService(userRepo, roleRepo, log)
@@ -79,7 +79,7 @@ func main() {
 	menuSvc := service.NewMenuService(menuRepo, log)
 	i18nSvc := service.NewI18nService(i18nRepo)
 	logSvc := service.NewLogService(logRepo)
-	paasSvc := service.NewPaasService(paasServerRepo, paasAppRepo, paasDomainRepo, paasSettingRepo,
+	paasSvc := service.NewPaasService(paasServerRepo, paasAppRepo, paasDomainRepo, paasGitHubAccountRepo,
 		cfg.PaaS.AESKey, cfg.PaaS.GitHubClientID, cfg.PaaS.GitHubClientSecret, log)
 	if cfg.PaaS.AESKey == "" {
 		log.Warn("PAAS_AES_KEY 未配置，PaaS 服务器凭证将无法加密保存，请尽快在 .env 中设置")

@@ -15,6 +15,7 @@ var paasMenuSeed = []model.Menu{
 	{ID: 1000061, ParentID: 1000001, Title: "服务器管理", Path: "/paas/server", Header: "home", Icon: "md-server", Type: "sider", Sort: 0},
 	{ID: 1000062, ParentID: 1000001, Title: "应用管理", Path: "/paas/app", Header: "home", Icon: "md-apps", Type: "sider", Sort: 1},
 	{ID: 1000063, ParentID: 1000001, Title: "域名管理", Path: "/paas/domain", Header: "home", Icon: "md-globe", Type: "sider", Sort: 2},
+	{ID: 1000064, ParentID: 1000001, Title: "系统设置", Path: "/paas/setting", Header: "home", Icon: "md-settings", Type: "sider", Sort: 3},
 }
 
 // EnsurePaasMenus 幂等补插 PaaS 菜单并绑定到管理员角色。

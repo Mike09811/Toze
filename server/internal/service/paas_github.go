@@ -2,18 +2,28 @@ package service
 
 import (
 	"context"
+	"errors"
+	"strconv"
 
+	"github.com/Mike09811/Toze/server/internal/model"
 	"github.com/Mike09811/Toze/server/internal/pkg/errcode"
 	"github.com/Mike09811/Toze/server/internal/pkg/githubx"
 	"github.com/Mike09811/Toze/server/internal/pkg/secretbox"
+	"github.com/Mike09811/Toze/server/internal/repository"
 )
 
-// GitHubDTO 授权状态。
-type GitHubDTO struct {
-	Connected bool   `json:"connected"`
+// GitHubAccountDTO 授权账号信息（不含 token）。
+type GitHubAccountDTO struct {
+	ID        string `json:"id"`
 	Login     string `json:"login"`
-	// OAuth 未配置时无法发起一键授权，只能构建公开仓库
-	OAuthConfigured bool `json:"oauth_configured"`
+	IsDefault bool   `json:"is_default"`
+	CreatedAt string `json:"created_at"`
+}
+
+// GitHubStatusDTO 授权总览。
+type GitHubStatusDTO struct {
+	Accounts        []GitHubAccountDTO `json:"accounts"`
+	OAuthConfigured bool               `json:"oauth_configured"`
 }
 
 // RepoDTO 仓库信息。
@@ -32,7 +42,7 @@ func (s *PaasService) GitHubAuthURL() (string, error) {
 	return githubx.AuthorizeURL(s.githubClientID, "repo"), nil
 }
 
-// GitHubCallback OAuth 回调：code 换 token，加密落库。
+// GitHubCallback OAuth 回调：code 换 token，按登录名合并入账号表。
 func (s *PaasService) GitHubCallback(ctx context.Context, code string) error {
 	if s.githubClientID == "" || s.githubClientSecret == "" {
 		return errcode.New(errcode.InvalidParams, "GitHub OAuth 未配置")
@@ -52,36 +62,47 @@ func (s *PaasService) GitHubCallback(ctx context.Context, code string) error {
 	if err != nil {
 		return errcode.Newf(errcode.Internal, "加密 GitHub 令牌失败: %v", err)
 	}
-	setting, err := s.settings.Get()
+
+	account, err := s.accounts.FindByLogin(login)
+	isNew := false
 	if err != nil {
+		if !errors.Is(err, repository.ErrNotFound) {
+			return err
+		}
+		account = &model.PaasGitHubAccount{}
+		isNew = true
+	}
+	account.Login = login
+	account.Token = encrypted
+	if count, _ := s.accounts.Count(); count == 0 {
+		account.IsDefault = true
+	}
+	if err := s.accounts.Upsert(account); err != nil {
 		return err
 	}
-	setting.GitHubLogin = login
-	setting.GitHubToken = encrypted
-	if err := s.settings.Save(setting); err != nil {
-		return err
-	}
-	s.log.Info("GitHub 授权成功", "login", login)
+	s.log.Info("GitHub 授权成功", "login", login, "new", isNew)
 	return nil
 }
 
-// GitHubStatus 当前授权状态。
-func (s *PaasService) GitHubStatus() (*GitHubDTO, error) {
-	setting, err := s.settings.Get()
+// GitHubStatus 授权总览：账号列表 + OAuth 配置状态。
+func (s *PaasService) GitHubStatus() (*GitHubStatusDTO, error) {
+	accounts, err := s.accounts.List()
 	if err != nil {
 		return nil, err
 	}
-	dto := &GitHubDTO{
-		Connected:       setting.GitHubToken != "",
-		Login:           setting.GitHubLogin,
-		OAuthConfigured: s.githubClientID != "" && s.githubClientSecret != "",
+	out := make([]GitHubAccountDTO, 0, len(accounts))
+	for i := range accounts {
+		out = append(out, ToGitHubAccountDTO(&accounts[i]))
 	}
-	return dto, nil
+	return &GitHubStatusDTO{
+		Accounts:        out,
+		OAuthConfigured: s.githubClientID != "" && s.githubClientSecret != "",
+	}, nil
 }
 
-// GitHubRepos 列出已授权用户的仓库。
-func (s *PaasService) GitHubRepos(ctx context.Context) ([]RepoDTO, error) {
-	token, err := s.githubToken()
+// GitHubRepos 列出指定账号的仓库；accountID 为空时用默认账号。
+func (s *PaasService) GitHubRepos(ctx context.Context, accountID uint64) ([]RepoDTO, error) {
+	token, _, err := s.resolveGitHubToken(accountID)
 	if err != nil {
 		return nil, err
 	}
@@ -100,29 +121,62 @@ func (s *PaasService) GitHubRepos(ctx context.Context) ([]RepoDTO, error) {
 	return out, nil
 }
 
-// GitHubDisconnect 断开授权。
-func (s *PaasService) GitHubDisconnect() error {
-	setting, err := s.settings.Get()
-	if err != nil {
+// GitHubSetDefault 设置默认账号。
+func (s *PaasService) GitHubSetDefault(id uint64) error {
+	if _, err := s.accounts.FindByID(id); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return errcode.New(errcode.NotFound, "账号不存在")
+		}
 		return err
 	}
-	setting.GitHubLogin = ""
-	setting.GitHubToken = ""
-	return s.settings.Save(setting)
+	return s.accounts.SetDefault(id)
 }
 
-// githubToken 解密 GitHub token；未授权时报错。
-func (s *PaasService) githubToken() (string, error) {
-	setting, err := s.settings.Get()
-	if err != nil {
-		return "", err
+// GitHubDeleteAccount 删除授权账号。
+func (s *PaasService) GitHubDeleteAccount(id uint64) error {
+	if err := s.accounts.Delete(id); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return errcode.New(errcode.NotFound, "账号不存在")
+		}
+		return err
 	}
-	if setting.GitHubToken == "" {
-		return "", errcode.New(errcode.Unauthorized, "尚未连接 GitHub，请先在应用管理页完成一键授权")
+	return nil
+}
+
+// resolveGitHubToken 解析可用 token：指定账号优先，其次默认账号。
+func (s *PaasService) resolveGitHubToken(accountID uint64) (token, login string, err error) {
+	var account *model.PaasGitHubAccount
+	if accountID > 0 {
+		account, err = s.accounts.FindByID(accountID)
+		if err != nil {
+			if errors.Is(err, repository.ErrNotFound) {
+				return "", "", errcode.New(errcode.NotFound, "GitHub 账号不存在，请到系统设置重新授权")
+			}
+			return "", "", err
+		}
+	} else {
+		accounts, lerr := s.accounts.List()
+		if lerr != nil {
+			return "", "", lerr
+		}
+		if len(accounts) == 0 {
+			return "", "", errcode.New(errcode.Unauthorized, "尚未连接 GitHub，请到系统设置完成一键授权")
+		}
+		account = &accounts[0] // List 排序：默认账号在前
 	}
-	token, err := secretbox.Decrypt(s.aesKey, setting.GitHubToken)
-	if err != nil {
-		return "", errcode.Newf(errcode.Internal, "解密 GitHub 令牌失败: %v", err)
+	plain, derr := secretbox.Decrypt(s.aesKey, account.Token)
+	if derr != nil {
+		return "", "", errcode.Newf(errcode.Internal, "解密 GitHub 令牌失败: %v", derr)
 	}
-	return token, nil
+	return plain, account.Login, nil
+}
+
+// ToGitHubAccountDTO 模型转响应。
+func ToGitHubAccountDTO(a *model.PaasGitHubAccount) GitHubAccountDTO {
+	return GitHubAccountDTO{
+		ID:        strconv.FormatUint(a.ID, 10),
+		Login:     a.Login,
+		IsDefault: a.IsDefault,
+		CreatedAt: formatTime(a.CreatedAt),
+	}
 }

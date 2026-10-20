@@ -176,18 +176,26 @@ export function GetPaasGitHubAuthURL () {
     });
 }
 
-export function GetPaasGitHubRepos () {
+export function GetPaasGitHubRepos (data) {
     return request({
         url: '/api/paas/github/repos',
         method: 'post',
-        data: {}
+        data: data || {}
     });
 }
 
-export function DisconnectPaasGitHub () {
+export function SetPaasGitHubDefault (data) {
     return request({
-        url: '/api/paas/github/disconnect',
+        url: '/api/paas/github/accounts/default',
         method: 'post',
-        data: {}
+        data
+    });
+}
+
+export function DeletePaasGitHubAccount (data) {
+    return request({
+        url: '/api/paas/github/accounts/delete',
+        method: 'post',
+        data
     });
 }

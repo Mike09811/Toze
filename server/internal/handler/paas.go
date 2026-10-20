@@ -54,17 +54,18 @@ type paasServerUpsertReq struct {
 }
 
 type paasAppUpsertReq struct {
-	ID            string   `json:"id"`
-	ServerID      string   `json:"server_id"`
-	Name          string   `json:"name"`
-	Image         string   `json:"image"`
-	SourceRepo    string   `json:"source_repo"`
-	SourceBranch  string   `json:"source_branch"`
-	ContainerPort int      `json:"container_port"`
-	HostPort      int      `json:"host_port"`
-	Env           []string `json:"env"`
-	Volumes       []string `json:"volumes"`
-	Restart       string   `json:"restart"`
+	ID              string   `json:"id"`
+	ServerID        string   `json:"server_id"`
+	Name            string   `json:"name"`
+	Image           string   `json:"image"`
+	SourceRepo      string   `json:"source_repo"`
+	SourceBranch    string   `json:"source_branch"`
+	SourceAccountID uint64   `json:"source_account_id"`
+	ContainerPort   int      `json:"container_port"`
+	HostPort        int      `json:"host_port"`
+	Env             []string `json:"env"`
+	Volumes         []string `json:"volumes"`
+	Restart         string   `json:"restart"`
 }
 
 type paasDomainUpsertReq struct {
@@ -395,13 +396,13 @@ func toPaasServerUpsert(req paasServerUpsertReq) service.PaasServerUpsert {
 func toPaasAppUpsert(req paasAppUpsertReq) service.PaasAppUpsert {
 	return service.PaasAppUpsert{
 		ID: req.ID, ServerID: req.ServerID, Name: req.Name, Image: req.Image,
-		SourceRepo: req.SourceRepo, SourceBranch: req.SourceBranch,
+		SourceRepo: req.SourceRepo, SourceBranch: req.SourceBranch, SourceAccountID: req.SourceAccountID,
 		ContainerPort: req.ContainerPort, HostPort: req.HostPort,
 		Env: req.Env, Volumes: req.Volumes, Restart: req.Restart,
 	}
 }
 
-// GitHubStatus POST /api/paas/github/status
+// GitHubStatus POST /api/paas/github/status（账号列表 + 配置状态）
 func (h *PaasHandler) GitHubStatus(c *gin.Context) {
 	dto, err := h.svc.GitHubStatus()
 	if err != nil {
@@ -409,6 +410,44 @@ func (h *PaasHandler) GitHubStatus(c *gin.Context) {
 		return
 	}
 	response.OK(c, dto)
+}
+
+// GitHubSetDefault POST /api/paas/github/accounts/default
+func (h *PaasHandler) GitHubSetDefault(c *gin.Context) {
+	var req struct {
+		ID string `json:"id"`
+	}
+	if !bind(c, &req) {
+		return
+	}
+	id, err := service.ParseID(req.ID)
+	if err != nil {
+		response.FailErr(c, err)
+		return
+	}
+	if err := h.svc.GitHubSetDefault(id); err != nil {
+		response.FailErr(c, err)
+		return
+	}
+	response.OKMsg(c, "已设为默认账号", gin.H{"msg": "ok"})
+}
+
+// GitHubDeleteAccount POST /api/paas/github/accounts/delete
+func (h *PaasHandler) GitHubDeleteAccount(c *gin.Context) {
+	var req deleteReq
+	if !bind(c, &req) {
+		return
+	}
+	id, err := service.ParseID(req.ID)
+	if err != nil {
+		response.FailErr(c, err)
+		return
+	}
+	if err := h.svc.GitHubDeleteAccount(id); err != nil {
+		response.FailErr(c, err)
+		return
+	}
+	response.OKMsg(c, "已删除授权账号", gin.H{"msg": "ok"})
 }
 
 // GitHubAuthURL POST /api/paas/github/auth/url
@@ -423,21 +462,19 @@ func (h *PaasHandler) GitHubAuthURL(c *gin.Context) {
 
 // GitHubRepos POST /api/paas/github/repos
 func (h *PaasHandler) GitHubRepos(c *gin.Context) {
-	repos, err := h.svc.GitHubRepos(c.Request.Context())
+	var req struct {
+		AccountID string `json:"account_id"`
+	}
+	if !bind(c, &req) {
+		return
+	}
+	accountID, _ := service.ParseID(req.AccountID)
+	repos, err := h.svc.GitHubRepos(c.Request.Context(), accountID)
 	if err != nil {
 		response.FailErr(c, err)
 		return
 	}
 	response.OK(c, repos)
-}
-
-// GitHubDisconnect POST /api/paas/github/disconnect
-func (h *PaasHandler) GitHubDisconnect(c *gin.Context) {
-	if err := h.svc.GitHubDisconnect(); err != nil {
-		response.FailErr(c, err)
-		return
-	}
-	response.OKMsg(c, "已断开 GitHub 授权", gin.H{"msg": "已断开"})
 }
 
 // GitHubCallback GET /api/paas/github/callback（浏览器 OAuth 回调，公开）

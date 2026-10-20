@@ -52,7 +52,7 @@ type PaasService struct {
 	servers  *repository.PaasServerRepository
 	apps     *repository.PaasAppRepository
 	domains  *repository.PaasDomainRepository
-	settings *repository.PaasSettingRepository
+	accounts *repository.PaasGitHubAccountRepository
 	log      *slog.Logger
 	aesKey   string
 	// GitHub OAuth 应用凭证，留空表示未配置（仍可构建公开仓库）
@@ -66,12 +66,12 @@ func NewPaasService(
 	servers *repository.PaasServerRepository,
 	apps *repository.PaasAppRepository,
 	domains *repository.PaasDomainRepository,
-	settings *repository.PaasSettingRepository,
+	accounts *repository.PaasGitHubAccountRepository,
 	aesKey, githubClientID, githubClientSecret string,
 	log *slog.Logger,
 ) *PaasService {
 	s := &PaasService{
-		servers: servers, apps: apps, domains: domains, settings: settings,
+		servers: servers, apps: apps, domains: domains, accounts: accounts,
 		log: log, aesKey: aesKey,
 		githubClientID: githubClientID, githubClientSecret: githubClientSecret,
 	}

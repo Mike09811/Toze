@@ -25,17 +25,18 @@ type PaasAppQuery struct {
 
 // PaasAppUpsert 应用新增 / 编辑入参。
 type PaasAppUpsert struct {
-	ID            string
-	ServerID      string
-	Name          string
-	Image         string // 直接部署现成镜像
-	SourceRepo    string // GitHub 构建：owner/repo，与 Image 二选一
-	SourceBranch  string // 构建分支，默认 main
-	ContainerPort int
-	HostPort      int
-	Env           []string // 每项格式 K=V
-	Volumes       []string // 每项格式 /host:/container[:ro|:rw]
-	Restart       string
+	ID              string
+	ServerID        string
+	Name            string
+	Image           string // 直接部署现成镜像
+	SourceRepo      string // GitHub 构建：owner/repo，与 Image 二选一
+	SourceBranch    string // 构建分支，默认 main
+	SourceAccountID uint64 // 构建用 GitHub 账号，0 表示默认/公开仓库
+	ContainerPort   int
+	HostPort        int
+	Env             []string // 每项格式 K=V
+	Volumes         []string // 每项格式 /host:/container[:ro|:rw]
+	Restart         string
 }
 
 // 输入白名单校验：应用名即容器名，镜像 / 环境变量 / 挂载全部走单引号包裹 + 字符集约束。
@@ -192,7 +193,7 @@ func (s *PaasService) DeployApp(id uint64) error {
 	// GitHub 构建模式：私有仓库需要授权 token，公开仓库未授权也可构建
 	githubToken := ""
 	if app.SourceRepo != "" {
-		if t, err := s.githubToken(); err == nil {
+		if t, _, err := s.resolveGitHubToken(app.SourceAccountID); err == nil {
 			githubToken = t
 		}
 	}
@@ -407,6 +408,7 @@ func (s *PaasService) buildApp(req PaasAppUpsert, existing *model.PaasApp) (*mod
 		}
 		app.SourceRepo = repo
 		app.SourceBranch = branch
+		app.SourceAccountID = req.SourceAccountID
 		app.Image = ""
 	case image != "":
 		if !paasImagePattern.MatchString(image) {
@@ -415,6 +417,7 @@ func (s *PaasService) buildApp(req PaasAppUpsert, existing *model.PaasApp) (*mod
 		app.Image = image
 		app.SourceRepo = ""
 		app.SourceBranch = ""
+		app.SourceAccountID = 0
 	default:
 		return nil, errcode.New(errcode.InvalidParams, "镜像地址与 GitHub 仓库至少填写一项")
 	}
@@ -495,20 +498,21 @@ func (s *PaasService) serverNameMap() map[uint64]string {
 // ToPaasAppDTO 模型转响应。
 func ToPaasAppDTO(a *model.PaasApp) PaasAppDTO {
 	return PaasAppDTO{
-		ID:            strconv.FormatUint(a.ID, 10),
-		ServerID:      strconv.FormatUint(a.ServerID, 10),
-		Name:          a.Name,
-		Image:         a.Image,
-		SourceRepo:    a.SourceRepo,
-		SourceBranch:  a.SourceBranch,
-		ContainerPort: a.ContainerPort,
-		HostPort:      a.HostPort,
-		Env:           decodeJSONStrings(a.Env),
-		Volumes:       decodeJSONStrings(a.Volumes),
-		Restart:       a.Restart,
-		ContainerID:   a.ContainerID,
-		Status:        a.Status,
-		LastError:     a.LastError,
-		CreatedAt:     formatTime(a.CreatedAt),
+		ID:              strconv.FormatUint(a.ID, 10),
+		ServerID:        strconv.FormatUint(a.ServerID, 10),
+		Name:            a.Name,
+		Image:           a.Image,
+		SourceRepo:      a.SourceRepo,
+		SourceBranch:    a.SourceBranch,
+		SourceAccountID: a.SourceAccountID,
+		ContainerPort:   a.ContainerPort,
+		HostPort:        a.HostPort,
+		Env:             decodeJSONStrings(a.Env),
+		Volumes:         decodeJSONStrings(a.Volumes),
+		Restart:         a.Restart,
+		ContainerID:     a.ContainerID,
+		Status:          a.Status,
+		LastError:       a.LastError,
+		CreatedAt:       formatTime(a.CreatedAt),
 	}
 }

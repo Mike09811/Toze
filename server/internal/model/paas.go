@@ -44,22 +44,24 @@ func (PaasServer) TableName() string { return "paas_servers" }
 
 // PaasApp 部署在纳管服务器上的容器应用。
 type PaasApp struct {
-	ID            uint64 `gorm:"primaryKey;autoIncrement"`
-	ServerID      uint64 `gorm:"index"`
-	Name          string `gorm:"size:64;uniqueIndex"` // 同时作为容器名，全局唯一
-	Image         string `gorm:"size:255"`
-	SourceRepo    string `gorm:"size:200"` // GitHub 构建：owner/repo，留空表示直接用镜像部署
-	SourceBranch  string `gorm:"size:100"`
-	ContainerPort int
-	HostPort      int
-	Env           string    `gorm:"type:text"` // JSON 数组 ["K=V", ...]
-	Volumes       string    `gorm:"type:text"` // JSON 数组 ["/host:/ctr[:ro]", ...]
-	Restart       string    `gorm:"size:32;default:always"`
-	ContainerID   string    `gorm:"size:64"`
-	Status        int       `gorm:"default:0;index"` // 0-未部署 1-运行中 2-已停止 3-部署中
-	LastError     string    `gorm:"type:text"`
-	CreatedAt     time.Time `gorm:"index"`
-	UpdatedAt     time.Time
+	ID           uint64 `gorm:"primaryKey;autoIncrement"`
+	ServerID     uint64 `gorm:"index"`
+	Name         string `gorm:"size:64;uniqueIndex"` // 同时作为容器名，全局唯一
+	Image        string `gorm:"size:255"`
+	SourceRepo   string `gorm:"size:200"` // GitHub 构建：owner/repo，留空表示直接用镜像部署
+	SourceBranch string `gorm:"size:100"`
+	// 构建所用 GitHub 账号 ID，0 表示公开仓库（未选账号）
+	SourceAccountID uint64 `gorm:"index"`
+	ContainerPort   int
+	HostPort        int
+	Env             string    `gorm:"type:text"` // JSON 数组 ["K=V", ...]
+	Volumes         string    `gorm:"type:text"` // JSON 数组 ["/host:/ctr[:ro]", ...]
+	Restart         string    `gorm:"size:32;default:always"`
+	ContainerID     string    `gorm:"size:64"`
+	Status          int       `gorm:"default:0;index"` // 0-未部署 1-运行中 2-已停止 3-部署中
+	LastError       string    `gorm:"type:text"`
+	CreatedAt       time.Time `gorm:"index"`
+	UpdatedAt       time.Time
 }
 
 // TableName 表名。
@@ -76,13 +78,15 @@ type PaasDomain struct {
 // TableName 表名。
 func (PaasDomain) TableName() string { return "paas_domains" }
 
-// PaasSetting PaaS 全局设置（单行表），目前存 GitHub OAuth 授权信息。
-type PaasSetting struct {
-	ID          uint64 `gorm:"primaryKey"`
-	GitHubLogin string `gorm:"size:100"`
-	GitHubToken string `gorm:"type:text"` // AES-GCM 加密后的 access token
-	UpdatedAt   time.Time
+// PaasGitHubAccount 已授权的 GitHub 账号，支持多个。
+type PaasGitHubAccount struct {
+	ID        uint64    `gorm:"primaryKey;autoIncrement"`
+	Login     string    `gorm:"size:100;uniqueIndex"`
+	Token     string    `gorm:"type:text"` // AES-GCM 加密后的 access token
+	IsDefault bool      `gorm:"default:false"`
+	CreatedAt time.Time `gorm:"index"`
+	UpdatedAt time.Time
 }
 
 // TableName 表名。
-func (PaasSetting) TableName() string { return "paas_settings" }
+func (PaasGitHubAccount) TableName() string { return "paas_github_accounts" }
