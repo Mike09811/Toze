@@ -368,7 +368,7 @@ func TestPaasGitHubBuildScript(t *testing.T) {
 	}
 	script := svc.buildDeployScript(app, "tok'en")
 	for _, want := range []string{
-		"WORK='/opt/toze/build/site'",
+		"WORK=\"$HOME\"/toze/build/site",
 		"git clone --depth 1 -b 'main' 'https://x-access-token:tok'\\''en@github.com/docker/getting-started.git'",
 		"docker build -t 'toze/site:latest' .",
 		"git -C \"$WORK\" remote remove origin",

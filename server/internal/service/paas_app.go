@@ -240,8 +240,8 @@ func (s *PaasService) buildDeployScript(app *model.PaasApp, githubToken string) 
 			branch = "main"
 		}
 		image = "toze/" + app.Name + ":latest"
-		work := "/opt/toze/build/" + app.Name
-		b.WriteString("WORK=" + sshx.Quote(work) + "\n")
+		// 构建目录放登录用户家目录下，root / 普通用户都有写权限；应用名已过白名单校验
+		b.WriteString("WORK=\"$HOME\"/toze/build/" + app.Name + "\n")
 		b.WriteString("rm -rf \"$WORK\" && mkdir -p \"$WORK\"\n")
 		b.WriteString("git clone --depth 1 -b " + sshx.Quote(branch) + " " + sshx.Quote(cloneURL) + " \"$WORK\"\n")
 		// 抹掉 remote 中的 token，避免明文留在服务器的 .git/config
