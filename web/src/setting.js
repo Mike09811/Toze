@@ -156,25 +156,7 @@ const Setting = {
      * */
     badge: {
         // 侧边菜单徽标
-        siderMenuBadge: [
-            {
-                path: '/dashboard/monitor',
-                count: 1
-            },
-            {
-                path: '/system',
-                text: 'New',
-                type: 'warning'
-            },
-            {
-                path: '/list',
-                color: 'cyan'
-            },
-            {
-                path: '/list/table-list',
-                color: 'cyan'
-            }
-        ],
+        siderMenuBadge: [],
         // 顶栏菜单徽标
         headerMenuBadge: []
     },
@@ -185,7 +167,7 @@ const Setting = {
         // 是否显示
         show: true,
         // 初始显示文案，可以通过 vuex 随时更新
-        text: 'Admin Plus',
+        text: 'Toze',
         // 水印配置
         options: {
 
