@@ -31,6 +31,17 @@ bash install.sh
 
 完成后访问 `http://服务器IP:8080`，默认账号 **admin / admin**（请立即在「系统管理 → 用户管理」修改密码）。
 
+## 更新升级
+
+部署目录本身就是 git 仓库，更新只需：
+
+```bash
+cd ~/Toze && git pull
+sudo docker compose up -d --build
+```
+
+`.env` 不在 git 里，更新不会覆盖密钥。
+
 ## 使用流程
 
 1. **服务器管理** → 添加服务器（IP / SSH 端口 / 账号 / 密码或私钥，凭证 AES-GCM 加密落库、永不回传）

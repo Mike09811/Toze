@@ -6,40 +6,22 @@
     "name": "home",
     "children": [
       {
-        "title": "PaaS 部署",
-        "path": "/paas",
-        "id": "1000060",
-        "header": "home",
-        "children": [
-          {
-            "title": "服务器管理",
-            "path": "/paas/server",
-            "id": "1000061"
-          },
-          {
-            "title": "应用管理",
-            "path": "/paas/app",
-            "id": "1000062"
-          },
-          {
-            "title": "域名管理",
-            "path": "/paas/domain",
-            "id": "1000063"
-          }
-        ]
+        "title": "服务器管理",
+        "path": "/paas/server",
+        "id": "1000061",
+        "header": "home"
       },
       {
-        "title": "系统管理",
-        "path": "/system",
-        "id": "1000004",
-        "header": "home",
-        "children": [
-          {
-            "title": "用户管理",
-            "path": "/system/user",
-            "id": "1000018"
-          }
-        ]
+        "title": "应用管理",
+        "path": "/paas/app",
+        "id": "1000062",
+        "header": "home"
+      },
+      {
+        "title": "域名管理",
+        "path": "/paas/domain",
+        "id": "1000063",
+        "header": "home"
       }
     ]
   },
