@@ -16,10 +16,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          go-version: "1.26"
           cache-dependency-path: server/go.sum
       - name: 依赖
         run: go mod download
+      - name: 格式化检查
+        run: test -z "$(gofmt -l ./cmd ./internal ./tests)"
       - name: 静态检查
         run: go vet ./...
       - name: 单元 + 接口测试
@@ -39,8 +41,9 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - name: 安装依赖
-        run: npm ci --no-audit --no-fund
+        run: npm ci --legacy-peer-deps --no-audit --no-fund
       - name: 构建
         env:
           NODE_OPTIONS: --openssl-legacy-provider
+          VUE_APP_TITLE: Toze
         run: npm run build
