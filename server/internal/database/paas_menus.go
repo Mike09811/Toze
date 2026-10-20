@@ -12,7 +12,7 @@ import (
 // 全量种子（seed/menus.json）已包含同样内容；这里解决的是
 // 「数据库已有数据、Seed 整体跳过」的老库不会出现新菜单的问题。
 var paasMenuSeed = []model.Menu{
-	{ID: 1000060, ParentID: 1000001, Title: "PaaS 部署", Path: "/paas", Header: "home", Type: "sider", Sort: 2},
+	{ID: 1000060, ParentID: 1000001, Title: "PaaS 部署", Path: "/paas", Header: "home", Type: "sider", Sort: 0},
 	{ID: 1000061, ParentID: 1000060, Title: "服务器管理", Path: "/paas/server", Type: "page", Sort: 0},
 	{ID: 1000062, ParentID: 1000060, Title: "应用管理", Path: "/paas/app", Type: "page", Sort: 1},
 	{ID: 1000063, ParentID: 1000060, Title: "域名管理", Path: "/paas/domain", Type: "page", Sort: 2},

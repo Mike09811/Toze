@@ -1,17 +1,7 @@
 import { h } from 'vue';
 
-import dashboard from './modules/dashboard';
 import system from './modules/system';
 import paas from './modules/paas';
-import form from './modules/form';
-import list from './modules/list';
-import search from './modules/search';
-import profile from './modules/profile';
-import result from './modules/result';
-import exception from './modules/exception';
-import setting from './modules/setting';
-import editor from './modules/editor';
-import tool from './modules/tool';
 
 
 import BasicLayout from '@/layouts/basic-layout';
@@ -24,7 +14,7 @@ const frameIn = [
     {
         path: '/',
         redirect: {
-            name: 'dashboard-console'
+            name: 'paas-server'
         },
         component: BasicLayout,
         children: [
@@ -32,7 +22,7 @@ const frameIn = [
                 path: 'index',
                 name: 'index',
                 redirect: {
-                    name: 'dashboard-console'
+                    name: 'paas-server'
                 }
             },
             {
@@ -67,30 +57,11 @@ const frameIn = [
                     },
                     render: () => h()
                 }
-            },
-            {
-                path: 'i18n',
-                name: 'i18n',
-                meta: {
-                    title: '$t:menu.i18n',
-                    auth: true
-                },
-                component: () => import('@/pages/i18n')
             }
         ]
     },
-    dashboard,
     system,
-    paas,
-    form,
-    list,
-    search,
-    profile,
-    result,
-    exception,
-    setting,
-    editor,
-    tool
+    paas
 ];
 
 /**

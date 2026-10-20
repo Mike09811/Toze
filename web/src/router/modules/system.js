@@ -23,24 +23,6 @@ export default {
                 title: '用户管理'
             },
             component: () => import('@/pages/sys/user')
-        },
-        {
-            path: 'menu',
-            name: `${pre}menu`,
-            meta: {
-                ...meta,
-                title: '菜单权限管理'
-            },
-            component: () => import('@/pages/sys/menu')
-        },
-        {
-            path: 'role',
-            name: `${pre}role`,
-            meta: {
-                ...meta,
-                title: '角色权限管理'
-            },
-            component: () => import('@/pages/sys/role')
         }
     ]
 };
