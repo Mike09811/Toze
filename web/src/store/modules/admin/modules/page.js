@@ -4,7 +4,6 @@
 import { get, cloneDeep } from 'lodash';
 import router from '@/router';
 import Setting from '@/setting';
-import menuSider from '@/menu/sider';
 import { getAllSiderMenu, includeArray } from '@/libs/system';
 
 // 判定是否需要缓存
@@ -63,7 +62,7 @@ export default {
                     .filter((opened, index) => valid[index] === 1)
                     // 对 menu 鉴权过滤
                     .filter(opened => {
-                        const allSiderMenu = getAllSiderMenu(menuSider);
+                        const allSiderMenu = getAllSiderMenu(rootState.admin.menu.menuSider);
                         const find = allSiderMenu.find(item => item.path === opened.fullPath);
 
                         let state = true;

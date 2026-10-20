@@ -19,7 +19,6 @@ import ViewUIPlus from 'view-ui-plus';
 
 // 菜单和路由
 import router from '@/router';
-import menuHeader from '@/menu/header';
 import { frameInRoutes } from '@/router/routes';
 
 // 多语言
@@ -43,8 +42,6 @@ const app = createApp({
     created () {
         // 处理路由 得到每一级的路由设置
         this.$store.commit('admin/page/init', frameInRoutes);
-        // 设置顶栏菜单
-        if (!Setting.dynamicMenu) this.$store.commit('admin/menu/setHeader', menuHeader);
         // 加载用户登录的数据
         this.$store.dispatch('admin/account/load');
         // 初始化全屏监听

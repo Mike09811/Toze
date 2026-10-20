@@ -6,7 +6,6 @@ import { includeArray, setNativeMenuSider, setNativeMenuHeader, getHeaderName, g
 import router from '@/router';
 import { MenuList } from '@api/menu';
 import Setting from '@/setting';
-import menuSider from '@/menu/sider';
 
 // 根据 menu 配置的权限，过滤菜单
 function filterMenu (menuList, access, lastList) {
@@ -225,7 +224,7 @@ export default {
                 commit('setHeader', menuHeaderList);
             }
             // 设置侧边栏菜单
-            const menuSiderList = Setting.dynamicMenu ? getNativeMenuSider() : [...menuSider];
+            const menuSiderList = getNativeMenuSider();
             let path = to.matched[to.matched.length - 1].path;
 
             let headerName = getHeaderName(path, menuSiderList);

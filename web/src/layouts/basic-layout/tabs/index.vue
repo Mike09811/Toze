@@ -50,7 +50,6 @@
 <script>
     import { resolveComponent } from 'vue';
     import { mapState, mapGetters, mapActions } from 'vuex';
-    import menuSider from '@/menu/sider';
     import tTitle from '../mixins/translate-title';
 
     import Setting from '@/setting';
@@ -68,6 +67,9 @@
             ...mapState('admin/page', [
                 'opened',
                 'current'
+            ]),
+            ...mapState('admin/menu', [
+                'menuSider'
             ]),
             ...mapState('admin/layout', [
                 'showTabsIcon',
@@ -90,6 +92,9 @@
             isHeaderStick () {
                 return this.hideSider;
             },
+            allSiderMenu () {
+                return getAllSiderMenu(this.menuSider);
+            },
             styles () {
                 let style = {};
                 if (this.tabsFix && !this.headerFix) {
@@ -107,8 +112,6 @@
         },
         data () {
             return {
-                // 得到所有侧边菜单，并转为平级，查询图标用
-                allSiderMenu: getAllSiderMenu(menuSider),
                 scrollTop: 0
             }
         },

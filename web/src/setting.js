@@ -197,7 +197,7 @@ const Setting = {
     // 相同路由，不同参数间进行切换，是否强力更新
     sameRouteForceUpdate: false,
     // 是否使用动态菜单
-    dynamicMenu: false
+    dynamicMenu: true
 };
 
 export default Setting;

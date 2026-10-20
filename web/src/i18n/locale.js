@@ -14,9 +14,6 @@ import layoutLocale from '@/layouts/basic-layout/i18n';
 // 页面语言包
 const pageLocale = require.context('@/pages', true, /i18n.js/);
 
-// 菜单语言包
-const menuLocale = require.context('@/menu', true, /i18n.js/);
-
 // 组件语言包
 const componentLocale = require.context('@/components', true, /i18n.js/);
 
@@ -58,16 +55,6 @@ function loadNativeLocaleMessages () {
             if (currentPage) {
                 Object.keys(currentPage).forEach(key => {
                     messages[lang.locale].page[key] = currentPage[key];
-                });
-            }
-        });
-
-        // 设置菜单语言包
-        menuLocale.keys().forEach(path => {
-            const currentMenu = menuLocale(path).default[lang.locale];
-            if (currentMenu) {
-                Object.keys(currentMenu).forEach(key => {
-                    messages[lang.locale].menu[key] = currentMenu[key];
                 });
             }
         });
