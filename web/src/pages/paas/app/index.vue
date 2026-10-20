@@ -19,8 +19,9 @@
                     <Badge v-else-if="row.status === 3" color="blue" text="部署中" />
                     <Badge v-else color="gray" text="未部署" />
                 </template>
-                <template #image="{ row }">
-                    <code>{{ row.image }}</code>
+                <template #source="{ row }">
+                    <code v-if="row.source_repo">{{ row.source_repo }}#{{ row.source_branch || 'main' }}</code>
+                    <code v-else>{{ row.image }}</code>
                 </template>
                 <template #lastError="{ row }">
                     <Tooltip v-if="row.last_error" :content="row.last_error" placement="top" max-width="400">
@@ -65,6 +66,16 @@
             :loading="modal.submitting"
             @on-ok="handleSubmit"
         >
+            <Alert v-if="form.sourceType === 'github' && !github.connected" type="warning" show-icon class="ivu-mb-16">
+                <template #desc>
+                    未连接 GitHub：可直接构建公开仓库；构建私有仓库需先
+                    <a @click="handleGitHubAuth">一键授权 GitHub</a>。
+                </template>
+            </Alert>
+            <div v-if="form.sourceType === 'github' && github.connected" class="ivu-mb-16">
+                <Tag color="green">GitHub 已连接：{{ github.login }}</Tag>
+                <a class="page-paas-danger" @click="handleGitHubDisconnect">断开</a>
+            </div>
             <Form :model="form" :rules="rules" ref="appForm" label-position="top">
                 <FormItem prop="server_id" label="所属服务器">
                     <Select v-model="form.server_id" placeholder="选择纳管的服务器">
@@ -78,8 +89,34 @@
                         </FormItem>
                     </Col>
                     <Col span="12">
+                        <FormItem label="来源">
+                            <RadioGroup v-model="form.sourceType">
+                                <Radio label="image">镜像</Radio>
+                                <Radio label="github">GitHub 构建</Radio>
+                            </RadioGroup>
+                        </FormItem>
+                    </Col>
+                </Row>
+                <Row :gutter="16" v-if="form.sourceType === 'image'">
+                    <Col span="24">
                         <FormItem prop="image" label="镜像">
                             <Input v-model="form.image" placeholder="如 nginx:1.27 或 registry.com/app:v1" />
+                        </FormItem>
+                    </Col>
+                </Row>
+                <Row :gutter="16" v-if="form.sourceType === 'github'">
+                    <Col span="16">
+                        <FormItem prop="source_repo" label="GitHub 仓库">
+                            <Select v-model="form.source_repo" filterable placeholder="选择仓库，或直接输入 owner/repo" @on-open-change="handleRepoDropdownOpen">
+                                <Option v-for="item in repos" :key="item.full_name" :value="item.full_name">
+                                    {{ item.full_name }}{{ item.private ? '（私有）' : '' }}
+                                </Option>
+                            </Select>
+                        </FormItem>
+                    </Col>
+                    <Col span="8">
+                        <FormItem prop="source_branch" label="分支">
+                            <Input v-model="form.source_branch" placeholder="默认 main" />
                         </FormItem>
                     </Col>
                 </Row>
@@ -123,7 +160,7 @@
     </div>
 </template>
 <script>
-    import { GetPaasAppList, CreatePaasApp, UpdatePaasApp, DeletePaasApp, DeployPaasApp, StartPaasApp, StopPaasApp, RestartPaasApp, GetPaasAppLogs, RefreshPaasAppStatus, GetPaasServerList } from '@api/paas';
+    import { GetPaasAppList, CreatePaasApp, UpdatePaasApp, DeletePaasApp, DeployPaasApp, StartPaasApp, StopPaasApp, RestartPaasApp, GetPaasAppLogs, RefreshPaasAppStatus, GetPaasServerList, GetPaasGitHubStatus, GetPaasGitHubAuthURL, GetPaasGitHubRepos, DisconnectPaasGitHub } from '@api/paas';
 
     export default {
         name: 'paas-app',
@@ -131,7 +168,7 @@
             return {
                 columns: [
                     { title: '应用', key: 'name', minWidth: 120 },
-                    { title: '镜像', key: 'image', slot: 'image', minWidth: 200 },
+                    { title: '来源', key: 'source', slot: 'source', minWidth: 200 },
                     { title: '服务器', key: 'server_name', minWidth: 100 },
                     { title: '端口(宿主→容器)', key: 'ports', slot: 'ports', width: 130, align: 'center' },
                     { title: '状态', key: 'status', slot: 'status', width: 100, align: 'center' },
@@ -157,7 +194,20 @@
                         { required: true, message: '请输入应用名', trigger: 'blur' },
                         { pattern: /^[a-z][a-z0-9-]{0,62}$/, message: '小写字母开头，仅小写字母/数字/中划线', trigger: 'blur' }
                     ],
-                    image: [{ required: true, message: '请输入镜像地址', trigger: 'blur' }]
+                    image: [{
+                        validator: (rule, value, callback) => {
+                            if (this.form.sourceType === 'image' && !value) callback(new Error('请输入镜像地址'));
+                            else callback();
+                        },
+                        trigger: 'blur'
+                    }],
+                    source_repo: [{
+                        validator: (rule, value, callback) => {
+                            if (this.form.sourceType === 'github' && !value) callback(new Error('请选择或输入仓库'));
+                            else callback();
+                        },
+                        trigger: 'change'
+                    }]
                 },
                 logs: {
                     show: false,
@@ -166,6 +216,13 @@
                     content: '',
                     loading: false
                 },
+                github: {
+                    connected: false,
+                    login: '',
+                    oauthConfigured: false
+                },
+                repos: [],
+                reposLoaded: false,
                 pollTimer: null
             };
         },
@@ -175,7 +232,10 @@
                     id: '',
                     server_id: '',
                     name: '',
+                    sourceType: 'image',
                     image: '',
+                    source_repo: '',
+                    source_branch: 'main',
                     container_port: 80,
                     host_port: 8080,
                     restart: 'always',
@@ -228,7 +288,10 @@
                     id: row.id,
                     server_id: row.server_id,
                     name: row.name,
+                    sourceType: row.source_repo ? 'github' : 'image',
                     image: row.image,
+                    source_repo: row.source_repo || '',
+                    source_branch: row.source_branch || 'main',
                     container_port: row.container_port,
                     host_port: row.host_port,
                     restart: row.restart || 'always',
@@ -248,7 +311,9 @@
                         id: this.form.id,
                         server_id: this.form.server_id,
                         name: this.form.name,
-                        image: this.form.image,
+                        image: this.form.sourceType === 'image' ? this.form.image : '',
+                        source_repo: this.form.sourceType === 'github' ? this.form.source_repo : '',
+                        source_branch: this.form.sourceType === 'github' ? this.form.source_branch : '',
                         container_port: this.form.container_port,
                         host_port: this.form.host_port,
                         restart: this.form.restart,
@@ -304,6 +369,36 @@
                     this.logs.loading = false;
                 });
             },
+            loadGitHubStatus () {
+                GetPaasGitHubStatus().then(res => {
+                    this.github = res;
+                });
+            },
+            handleGitHubAuth () {
+                GetPaasGitHubAuthURL().then(res => {
+                    window.location.href = res.url;
+                });
+            },
+            handleGitHubDisconnect () {
+                this.$Modal.confirm({
+                    title: '断开确认',
+                    content: '断开后将无法构建私有仓库，确定继续？',
+                    onOk: () => {
+                        DisconnectPaasGitHub().then(() => {
+                            this.$Message.success('已断开 GitHub 授权');
+                            this.loadGitHubStatus();
+                        });
+                    }
+                });
+            },
+            handleRepoDropdownOpen (open) {
+                if (open && !this.reposLoaded) {
+                    GetPaasGitHubRepos().then(res => {
+                        this.repos = res || [];
+                        this.reposLoaded = true;
+                    });
+                }
+            },
             handleDelete (row) {
                 this.$Modal.confirm({
                     title: '删除确认',
@@ -320,6 +415,10 @@
         mounted () {
             this.getData();
             this.loadServers();
+            this.loadGitHubStatus();
+            if (this.$route.query.github === 'ok') {
+                this.$Message.success('GitHub 授权成功');
+            }
         },
         beforeUnmount () {
             if (this.pollTimer) clearInterval(this.pollTimer);

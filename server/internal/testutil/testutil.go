@@ -101,6 +101,7 @@ func NewRouter(t *testing.T, db *gorm.DB) (*gin.Engine, *token.Manager) {
 	paasServerRepo := repository.NewPaasServerRepository(db)
 	paasAppRepo := repository.NewPaasAppRepository(db)
 	paasDomainRepo := repository.NewPaasDomainRepository(db)
+	paasSettingRepo := repository.NewPaasSettingRepository(db)
 
 	jwtMgr := token.New("test-secret-key-0123456789", "test", time.Hour)
 
@@ -110,7 +111,7 @@ func NewRouter(t *testing.T, db *gorm.DB) (*gin.Engine, *token.Manager) {
 	menuSvc := service.NewMenuService(menuRepo, log)
 	i18nSvc := service.NewI18nService(i18nRepo)
 	logSvc := service.NewLogService(logRepo)
-	paasSvc := service.NewPaasService(paasServerRepo, paasAppRepo, paasDomainRepo, "test-aes-key", log)
+	paasSvc := service.NewPaasService(paasServerRepo, paasAppRepo, paasDomainRepo, paasSettingRepo, "test-aes-key", "", "", log)
 	// HTTP 测试不连真实服务器，远程脚本一律返回成功占位
 	paasSvc.SetExec(func(ctx context.Context, server *model.PaasServer, secret, script string) (string, error) {
 		return "stubbed", nil

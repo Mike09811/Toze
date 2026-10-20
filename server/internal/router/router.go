@@ -59,6 +59,8 @@ func New(d Deps) *gin.Engine {
 
 	api := r.Group("/api")
 	api.POST("/login", middleware.RateLimit(10, time.Minute), d.Handler.Auth.Login)
+	// GitHub OAuth 浏览器回调（带 code 换 token），无需登录态
+	api.GET("/paas/github/callback", d.Handler.Paas.GitHubCallback)
 	api.POST("/register", middleware.RateLimit(5, time.Minute), d.Handler.Auth.Register)
 
 	secured := api.Group("")
@@ -78,6 +80,7 @@ func New(d Deps) *gin.Engine {
 
 		// PaaS 查询类：登录即可
 		secured.POST("/paas/server/list", d.Handler.Paas.ServerList)
+		secured.POST("/paas/github/status", d.Handler.Paas.GitHubStatus)
 		secured.POST("/paas/app/list", d.Handler.Paas.AppList)
 		secured.POST("/paas/domain/list", d.Handler.Paas.DomainList)
 
@@ -120,6 +123,10 @@ func New(d Deps) *gin.Engine {
 
 			admin.POST("/paas/domain/create", d.Handler.Paas.DomainCreate)
 			admin.POST("/paas/domain/delete", d.Handler.Paas.DomainDelete)
+
+			admin.POST("/paas/github/auth/url", d.Handler.Paas.GitHubAuthURL)
+			admin.POST("/paas/github/repos", d.Handler.Paas.GitHubRepos)
+			admin.POST("/paas/github/disconnect", d.Handler.Paas.GitHubDisconnect)
 		}
 	}
 

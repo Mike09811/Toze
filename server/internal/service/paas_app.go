@@ -28,7 +28,9 @@ type PaasAppUpsert struct {
 	ID            string
 	ServerID      string
 	Name          string
-	Image         string
+	Image         string // 直接部署现成镜像
+	SourceRepo    string // GitHub 构建：owner/repo，与 Image 二选一
+	SourceBranch  string // 构建分支，默认 main
 	ContainerPort int
 	HostPort      int
 	Env           []string // 每项格式 K=V
@@ -46,6 +48,11 @@ var (
 )
 
 var paasRestartPolicies = map[string]bool{"always": true, "unless-stopped": true, "on-failure": true, "no": true}
+
+var (
+	paasRepoPattern   = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`)
+	paasBranchPattern = regexp.MustCompile(`^[A-Za-z0-9._/-]{1,100}$`)
+)
 
 // ListApps 分页查询应用，附带所属服务器名称。
 func (s *PaasService) ListApps(q PaasAppQuery) ([]PaasAppDTO, int64, error) {
@@ -182,7 +189,14 @@ func (s *PaasService) DeployApp(id uint64) error {
 	if err != nil {
 		return err
 	}
-	script := s.buildDeployScript(app)
+	// GitHub 构建模式：私有仓库需要授权 token，公开仓库未授权也可构建
+	githubToken := ""
+	if app.SourceRepo != "" {
+		if t, err := s.githubToken(); err == nil {
+			githubToken = t
+		}
+	}
+	script := s.buildDeployScript(app, githubToken)
 	if err := s.apps.UpdateDeployment(id, app.ContainerID, model.PaasAppDeploying, ""); err != nil {
 		return err
 	}
@@ -209,10 +223,33 @@ func (s *PaasService) DeployApp(id uint64) error {
 	return nil
 }
 
-// buildDeployScript 拼接 docker run 脚本，所有动态值均单引号包裹。
-func (s *PaasService) buildDeployScript(app *model.PaasApp) string {
+// buildDeployScript 拼接部署脚本，所有动态值均单引号包裹。
+// 镜像模式直接 docker run；GitHub 模式先在服务器上 clone + docker build。
+func (s *PaasService) buildDeployScript(app *model.PaasApp, githubToken string) string {
 	var b strings.Builder
 	b.WriteString("set -e\n")
+
+	image := app.Image
+	if app.SourceRepo != "" {
+		cloneURL := "https://github.com/" + app.SourceRepo + ".git"
+		if githubToken != "" {
+			cloneURL = "https://x-access-token:" + githubToken + "@github.com/" + app.SourceRepo + ".git"
+		}
+		branch := app.SourceBranch
+		if branch == "" {
+			branch = "main"
+		}
+		image = "toze/" + app.Name + ":latest"
+		work := "/opt/toze/build/" + app.Name
+		b.WriteString("WORK=" + sshx.Quote(work) + "\n")
+		b.WriteString("rm -rf \"$WORK\" && mkdir -p \"$WORK\"\n")
+		b.WriteString("git clone --depth 1 -b " + sshx.Quote(branch) + " " + sshx.Quote(cloneURL) + " \"$WORK\"\n")
+		// 抹掉 remote 中的 token，避免明文留在服务器的 .git/config
+		b.WriteString("git -C \"$WORK\" remote remove origin\n")
+		b.WriteString("cd \"$WORK\"\n")
+		b.WriteString("docker build -t " + sshx.Quote(image) + " .\n")
+	}
+
 	b.WriteString("docker rm -f " + sshx.Quote(app.Name) + " >/dev/null 2>&1 || true\n")
 	b.WriteString("cid=$(docker run -d --name " + sshx.Quote(app.Name))
 	b.WriteString(" --restart " + sshx.Quote(app.Restart))
@@ -223,7 +260,7 @@ func (s *PaasService) buildDeployScript(app *model.PaasApp) string {
 	for _, v := range decodeJSONStrings(app.Volumes) {
 		b.WriteString(" -v " + sshx.Quote(v))
 	}
-	b.WriteString(" " + sshx.Quote(app.Image) + ")\n")
+	b.WriteString(" " + sshx.Quote(image) + ")\n")
 	b.WriteString("echo \"$cid\"\n")
 	return b.String()
 }
@@ -354,10 +391,33 @@ func (s *PaasService) buildApp(req PaasAppUpsert, existing *model.PaasApp) (*mod
 	app.Name = name
 
 	image := strings.TrimSpace(req.Image)
-	if !paasImagePattern.MatchString(image) {
-		return nil, errcode.New(errcode.InvalidParams, "镜像地址格式不正确")
+	repo := strings.TrimSpace(req.SourceRepo)
+	branch := strings.TrimSpace(req.SourceBranch)
+	switch {
+	case repo != "":
+		// GitHub 构建：在目标服务器上 clone + docker build
+		if !paasRepoPattern.MatchString(repo) {
+			return nil, errcode.New(errcode.InvalidParams, "仓库格式应为 owner/repo，如 docker/getting-started")
+		}
+		if branch == "" {
+			branch = "main"
+		}
+		if !paasBranchPattern.MatchString(branch) {
+			return nil, errcode.New(errcode.InvalidParams, "分支名含有不支持的字符")
+		}
+		app.SourceRepo = repo
+		app.SourceBranch = branch
+		app.Image = ""
+	case image != "":
+		if !paasImagePattern.MatchString(image) {
+			return nil, errcode.New(errcode.InvalidParams, "镜像地址格式不正确")
+		}
+		app.Image = image
+		app.SourceRepo = ""
+		app.SourceBranch = ""
+	default:
+		return nil, errcode.New(errcode.InvalidParams, "镜像地址与 GitHub 仓库至少填写一项")
 	}
-	app.Image = image
 
 	if req.ContainerPort < 1 || req.ContainerPort > 65535 || req.HostPort < 1 || req.HostPort > 65535 {
 		return nil, errcode.New(errcode.InvalidParams, "容器端口与宿主机端口必须在 1-65535 之间")
@@ -439,6 +499,8 @@ func ToPaasAppDTO(a *model.PaasApp) PaasAppDTO {
 		ServerID:      strconv.FormatUint(a.ServerID, 10),
 		Name:          a.Name,
 		Image:         a.Image,
+		SourceRepo:    a.SourceRepo,
+		SourceBranch:  a.SourceBranch,
 		ContainerPort: a.ContainerPort,
 		HostPort:      a.HostPort,
 		Env:           decodeJSONStrings(a.Env),

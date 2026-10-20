@@ -48,6 +48,8 @@ type PaasApp struct {
 	ServerID      uint64 `gorm:"index"`
 	Name          string `gorm:"size:64;uniqueIndex"` // 同时作为容器名，全局唯一
 	Image         string `gorm:"size:255"`
+	SourceRepo    string `gorm:"size:200"` // GitHub 构建：owner/repo，留空表示直接用镜像部署
+	SourceBranch  string `gorm:"size:100"`
 	ContainerPort int
 	HostPort      int
 	Env           string    `gorm:"type:text"` // JSON 数组 ["K=V", ...]
@@ -73,3 +75,14 @@ type PaasDomain struct {
 
 // TableName 表名。
 func (PaasDomain) TableName() string { return "paas_domains" }
+
+// PaasSetting PaaS 全局设置（单行表），目前存 GitHub OAuth 授权信息。
+type PaasSetting struct {
+	ID          uint64 `gorm:"primaryKey"`
+	GitHubLogin string `gorm:"size:100"`
+	GitHubToken string `gorm:"type:text"` // AES-GCM 加密后的 access token
+	UpdatedAt   time.Time
+}
+
+// TableName 表名。
+func (PaasSetting) TableName() string { return "paas_settings" }

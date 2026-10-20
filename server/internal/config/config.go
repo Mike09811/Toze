@@ -71,6 +71,10 @@ type LogConfig struct {
 type PaaSConfig struct {
 	// AESKey 用于 SSH 凭证落库加密（PAAS_AES_KEY），更换后已存凭证将无法解密
 	AESKey string
+	// GitHub OAuth 应用（GitHub Settings → Developer settings → OAuth Apps 创建）
+	// 留空则无法一键授权，但仍可通过仓库全名构建公开仓库
+	GitHubClientID     string
+	GitHubClientSecret string
 }
 
 // Load 读取配置，envFile 不存在时忽略。
@@ -121,7 +125,9 @@ func Load(envFile string) (*Config, error) {
 			Format: getString("LOG_FORMAT", "text"),
 		},
 		PaaS: PaaSConfig{
-			AESKey: getString("PAAS_AES_KEY", ""),
+			AESKey:             getString("PAAS_AES_KEY", ""),
+			GitHubClientID:     getString("GITHUB_CLIENT_ID", ""),
+			GitHubClientSecret: getString("GITHUB_CLIENT_SECRET", ""),
 		},
 	}
 

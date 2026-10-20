@@ -47,14 +47,18 @@ type PaasServerUpsert struct {
 	AuthContent string // 编辑时留空表示保持原凭证
 }
 
-// PaasService PaaS 部署平台业务逻辑：服务器纳管、容器部署、域名反代。
+// PaasService PaaS 部署平台业务逻辑：服务器纳管、容器部署、域名反代、GitHub 构建。
 type PaasService struct {
-	servers *repository.PaasServerRepository
-	apps    *repository.PaasAppRepository
-	domains *repository.PaasDomainRepository
-	log     *slog.Logger
-	aesKey  string
-	exec    SSHExec
+	servers  *repository.PaasServerRepository
+	apps     *repository.PaasAppRepository
+	domains  *repository.PaasDomainRepository
+	settings *repository.PaasSettingRepository
+	log      *slog.Logger
+	aesKey   string
+	// GitHub OAuth 应用凭证，留空表示未配置（仍可构建公开仓库）
+	githubClientID     string
+	githubClientSecret string
+	exec               SSHExec
 }
 
 // NewPaasService 构造函数；aesKey 用于 SSH 凭证落库加密。
@@ -62,10 +66,15 @@ func NewPaasService(
 	servers *repository.PaasServerRepository,
 	apps *repository.PaasAppRepository,
 	domains *repository.PaasDomainRepository,
-	aesKey string,
+	settings *repository.PaasSettingRepository,
+	aesKey, githubClientID, githubClientSecret string,
 	log *slog.Logger,
 ) *PaasService {
-	s := &PaasService{servers: servers, apps: apps, domains: domains, log: log, aesKey: aesKey}
+	s := &PaasService{
+		servers: servers, apps: apps, domains: domains, settings: settings,
+		log: log, aesKey: aesKey,
+		githubClientID: githubClientID, githubClientSecret: githubClientSecret,
+	}
 	s.exec = defaultSSHExec
 	return s
 }
@@ -280,6 +289,10 @@ if ! command -v docker >/dev/null 2>&1; then
     curl -fsSL https://get.docker.com | $SUDO sh
 fi
 $SUDO systemctl enable --now docker
+if ! command -v git >/dev/null 2>&1; then
+    $SUDO apt-get update -y >/dev/null 2>&1 || true
+    $SUDO apt-get install -y git
+fi
 LOGIN_USER="$(id -un)"
 if [ "$LOGIN_USER" != root ] && ! id -nG "$LOGIN_USER" | tr ' ' '\n' | grep -qx docker; then
     $SUDO usermod -aG docker "$LOGIN_USER"

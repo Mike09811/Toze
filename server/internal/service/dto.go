@@ -191,6 +191,8 @@ type PaasAppDTO struct {
 	ServerName    string   `json:"server_name"`
 	Name          string   `json:"name"`
 	Image         string   `json:"image"`
+	SourceRepo    string   `json:"source_repo"`
+	SourceBranch  string   `json:"source_branch"`
 	ContainerPort int      `json:"container_port"`
 	HostPort      int      `json:"host_port"`
 	Env           []string `json:"env"`

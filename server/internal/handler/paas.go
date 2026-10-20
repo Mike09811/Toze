@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 
@@ -57,6 +58,8 @@ type paasAppUpsertReq struct {
 	ServerID      string   `json:"server_id"`
 	Name          string   `json:"name"`
 	Image         string   `json:"image"`
+	SourceRepo    string   `json:"source_repo"`
+	SourceBranch  string   `json:"source_branch"`
 	ContainerPort int      `json:"container_port"`
 	HostPort      int      `json:"host_port"`
 	Env           []string `json:"env"`
@@ -392,9 +395,58 @@ func toPaasServerUpsert(req paasServerUpsertReq) service.PaasServerUpsert {
 func toPaasAppUpsert(req paasAppUpsertReq) service.PaasAppUpsert {
 	return service.PaasAppUpsert{
 		ID: req.ID, ServerID: req.ServerID, Name: req.Name, Image: req.Image,
+		SourceRepo: req.SourceRepo, SourceBranch: req.SourceBranch,
 		ContainerPort: req.ContainerPort, HostPort: req.HostPort,
 		Env: req.Env, Volumes: req.Volumes, Restart: req.Restart,
 	}
+}
+
+// GitHubStatus POST /api/paas/github/status
+func (h *PaasHandler) GitHubStatus(c *gin.Context) {
+	dto, err := h.svc.GitHubStatus()
+	if err != nil {
+		response.FailErr(c, err)
+		return
+	}
+	response.OK(c, dto)
+}
+
+// GitHubAuthURL POST /api/paas/github/auth/url
+func (h *PaasHandler) GitHubAuthURL(c *gin.Context) {
+	url, err := h.svc.GitHubAuthURL()
+	if err != nil {
+		response.FailErr(c, err)
+		return
+	}
+	response.OK(c, gin.H{"url": url})
+}
+
+// GitHubRepos POST /api/paas/github/repos
+func (h *PaasHandler) GitHubRepos(c *gin.Context) {
+	repos, err := h.svc.GitHubRepos(c.Request.Context())
+	if err != nil {
+		response.FailErr(c, err)
+		return
+	}
+	response.OK(c, repos)
+}
+
+// GitHubDisconnect POST /api/paas/github/disconnect
+func (h *PaasHandler) GitHubDisconnect(c *gin.Context) {
+	if err := h.svc.GitHubDisconnect(); err != nil {
+		response.FailErr(c, err)
+		return
+	}
+	response.OKMsg(c, "已断开 GitHub 授权", gin.H{"msg": "已断开"})
+}
+
+// GitHubCallback GET /api/paas/github/callback（浏览器 OAuth 回调，公开）
+func (h *PaasHandler) GitHubCallback(c *gin.Context) {
+	if err := h.svc.GitHubCallback(c.Request.Context(), c.Query("code")); err != nil {
+		c.String(http.StatusInternalServerError, "GitHub 授权失败: %v", err)
+		return
+	}
+	c.Redirect(http.StatusFound, "/paas/app?github=ok")
 }
 
 func toPaasDomainUpsert(req paasDomainUpsertReq) service.PaasDomainUpsert {

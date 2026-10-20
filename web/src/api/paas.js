@@ -157,3 +157,37 @@ export function DeletePaasDomain (data) {
         data
     });
 }
+
+// ---------- GitHub 构建 ----------
+
+export function GetPaasGitHubStatus () {
+    return request({
+        url: '/api/paas/github/status',
+        method: 'post',
+        data: {}
+    });
+}
+
+export function GetPaasGitHubAuthURL () {
+    return request({
+        url: '/api/paas/github/auth/url',
+        method: 'post',
+        data: {}
+    });
+}
+
+export function GetPaasGitHubRepos () {
+    return request({
+        url: '/api/paas/github/repos',
+        method: 'post',
+        data: {}
+    });
+}
+
+export function DisconnectPaasGitHub () {
+    return request({
+        url: '/api/paas/github/disconnect',
+        method: 'post',
+        data: {}
+    });
+}

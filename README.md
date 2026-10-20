@@ -42,6 +42,19 @@ sudo docker compose up -d --build
 
 `.env` 不在 git 里，更新不会覆盖密钥。
 
+## GitHub 构建
+
+应用来源支持两种：**镜像**（直接填现成镜像）与 **GitHub 构建**（在目标服务器上 `git clone + docker build`，仓库根目录需有 `Dockerfile`）。
+
+- **公开仓库**：无需任何配置，直接填 `owner/repo` 即可构建
+- **私有仓库**：需要一键授权 GitHub。到 GitHub → Settings → Developer settings → OAuth Apps 创建一个应用：
+  - Homepage URL：`http://你的服务器IP:8080`
+  - Authorization callback URL：`http://你的服务器IP:8080/api/paas/github/callback`
+  - 把生成的 Client ID / Client Secret 填到 `.env`（`GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`）后 `docker compose up -d` 重启
+  - 在「应用管理 → 新建应用 → GitHub 构建」里点「一键授权 GitHub」完成绑定
+
+授权 token 使用 AES-GCM 加密存储，构建时仅在目标服务器上瞬时使用并随即抹除。
+
 ## 使用流程
 
 1. **服务器管理** → 添加服务器（IP / SSH 端口 / 账号 / 密码或私钥，凭证 AES-GCM 加密落库、永不回传）

@@ -79,7 +79,8 @@ func newPaasTestService(t *testing.T) (*PaasService, *fakeExec, *gorm.DB) {
 		repository.NewPaasServerRepository(db),
 		repository.NewPaasAppRepository(db),
 		repository.NewPaasDomainRepository(db),
-		"test-aes-key",
+		repository.NewPaasSettingRepository(db),
+		"test-aes-key", "", "",
 		slog.New(slog.NewTextHandler(io.Discard, nil)),
 	)
 	svc.SetExec(fake.exec)
@@ -224,7 +225,7 @@ func TestPaasDeployScriptQuotesEverything(t *testing.T) {
 	srv := seedServer(t, svc)
 	app := seedApp(t, svc, srv.ID, "web", 8080)
 	app.Image = "my repo/app:v1'evil" // 构造极端值直接验证脚本拼接
-	script := svc.buildDeployScript(app)
+	script := svc.buildDeployScript(app, "")
 
 	for _, want := range []string{
 		"--name 'web'",
@@ -349,4 +350,45 @@ func mustUint(s string) uint64 {
 		panic(err)
 	}
 	return id
+}
+
+func TestPaasGitHubBuildScript(t *testing.T) {
+	svc, _, _ := newPaasTestService(t)
+	srv := seedServer(t, svc)
+	dto, err := svc.CreateApp(PaasAppUpsert{
+		ServerID: u64str(srv.ID), Name: "site", SourceRepo: "docker/getting-started", SourceBranch: "main",
+		ContainerPort: 3000, HostPort: 18090,
+	})
+	if err != nil {
+		t.Fatalf("create github app: %v", err)
+	}
+	app, _ := svc.apps.FindByID(mustUint(dto.ID))
+	if app.Image != "" || app.SourceRepo != "docker/getting-started" {
+		t.Fatalf("GitHub 应用不应存镜像字段: %+v", app)
+	}
+	script := svc.buildDeployScript(app, "tok'en")
+	for _, want := range []string{
+		"WORK='/opt/toze/build/site'",
+		"git clone --depth 1 -b 'main' 'https://x-access-token:tok'\\''en@github.com/docker/getting-started.git'",
+		"docker build -t 'toze/site:latest' .",
+		"git -C \"$WORK\" remote remove origin",
+		"--name 'site'",
+		"-p '18090:3000'",
+		"'toze/site:latest'",
+	} {
+		if !strings.Contains(script, want) {
+			t.Fatalf("构建脚本缺少 %q:\n%s", want, script)
+		}
+	}
+	// 二选一校验
+	if _, err := svc.CreateApp(PaasAppUpsert{
+		ServerID: u64str(srv.ID), Name: "both", Image: "nginx", SourceRepo: "a/b", ContainerPort: 80, HostPort: 1,
+	}); err != nil {
+		t.Fatalf("同时填写时以仓库为准，不应报错")
+	}
+	if _, err := svc.CreateApp(PaasAppUpsert{
+		ServerID: u64str(srv.ID), Name: "none", ContainerPort: 80, HostPort: 2,
+	}); err == nil {
+		t.Fatalf("镜像与仓库都为空应被拒绝")
+	}
 }
