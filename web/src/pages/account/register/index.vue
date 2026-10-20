@@ -8,7 +8,7 @@
                 <div class="page-account-top-logo">
                     <img src="@/assets/images/logo.png" alt="logo">
                 </div>
-                <div class="page-account-top-desc">Admin Plus 企业级中后台前端解决方案</div>
+                <div class="page-account-top-desc">自带服务器的极简 PaaS</div>
             </div>
             <Login ref="form" @on-submit="handleSubmit">
                 <Email name="mail" />

@@ -8,22 +8,17 @@
                 <div class="page-account-top-logo">
                     <img src="@/assets/images/logo.png" alt="logo">
                 </div>
-                <div class="page-account-top-desc">Admin Plus 企业级中后台前端解决方案</div>
+                <div class="page-account-top-desc">自带服务器的极简 PaaS</div>
             </div>
             <Login @on-submit="handleSubmit">
-                <UserName name="username" value="admin" />
-                <Password name="password" value="admin" enter-to-submit />
+                <UserName name="username" />
+                <Password name="password" enter-to-submit />
                 <div class="page-account-auto-login">
                     <Checkbox v-model="autoLogin" size="large">{{ $t('page.login.remember') }}</Checkbox>
-                    <a href="">{{ $t('page.login.forgot') }}</a>
                 </div>
                 <Submit>{{ $t('page.login.submit') }}</Submit>
             </Login>
             <div class="page-account-other">
-                <span>{{ $t('page.login.other') }}</span>
-                <img src="@/assets/svg/icon-social-wechat.svg" alt="wechat">
-                <img src="@/assets/svg/icon-social-qq.svg" alt="qq">
-                <img src="@/assets/svg/icon-social-weibo.svg" alt="weibo">
                 <router-link class="page-account-register" :to="{ name: 'register' }">{{ $t('page.login.signup') }}</router-link>
             </div>
         </div>

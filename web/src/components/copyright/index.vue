@@ -8,25 +8,13 @@
             return {
                 links: [
                     {
-                        title: '官网',
-                        key: '官网',
-                        href: 'https://www.iviewui.com',
-                        blankTarget: true
-                    },
-                    {
-                        title: '社区',
-                        key: '社区',
-                        href: 'https://dev.iviewui.com',
-                        blankTarget: true
-                    },
-                    {
-                        title: 'Admin Plus',
-                        key: '专业版',
-                        href: 'https://www.iviewui.com/admin-plus',
+                        title: 'GitHub',
+                        key: 'GitHub',
+                        href: 'https://github.com/Mike09811/Toze',
                         blankTarget: true
                     }
                 ],
-                copyright: 'Copyright © 2022 View Design All Rights Reserved'
+                copyright: 'Copyright © 2026 Toze'
             }
         }
     }
