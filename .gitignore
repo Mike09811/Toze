@@ -1,0 +1,22 @@
+# 依赖与构建产物
+node_modules/
+dist/
+server/bin/
+server/coverage.out
+coverage.out
+
+# 本地配置
+.env
+*.local
+
+# 系统 / 编辑器
+.DS_Store
+.idea/
+.vscode/
+*.log
+
+# 运行时
+.run-logs/
+.gopath/
+.gocache/
+.npm-cache/

@@ -1,0 +1,149 @@
+@import (reference) '../../styles/default/index';
+
+.page-account{
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: auto;
+
+    &-container{
+        flex: 1;
+        padding: 32px 0;
+        text-align: center;
+        width: 384px;
+        margin: 0 auto;
+
+        &-result{
+            width: 100%;
+        }
+
+        @media screen and (max-width: @screen-sm) {
+            width: 95%;
+        }
+    }
+
+    &-tabs{
+        .ivu-tabs-bar{
+            border-bottom: none;
+        }
+        .ivu-tabs-nav-scroll{
+            text-align: center;
+        }
+        .ivu-tabs-nav{
+            display: inline-block;
+            float: none;
+        }
+    }
+
+    &-top{
+        padding: 32px 0;
+        &-logo{
+            img{
+                height: 75px;
+            }
+        }
+        &-desc{
+            font-size: @font-size-base;
+            color: @subsidiary-color;
+        }
+    }
+
+    &-main{
+        .ivu-card-body{
+            padding-top: 32px;
+        }
+    }
+
+    &-auto-login{
+        margin-bottom: 24px;
+        text-align: left;
+        a{
+            float: right;
+        }
+    }
+
+    &-other{
+        margin: 24px 0;
+        text-align: left;
+        span{
+            font-size: @font-size-base;
+        }
+        img{
+            width: 24px;
+            margin-left: 16px;
+            cursor: pointer;
+            vertical-align: middle;
+            opacity: 0.7;
+            transition: all @transition-time @ease-in-out;
+            &:hover{
+                opacity: 1;
+            }
+        }
+    }
+
+    .ivu-poptip, .ivu-poptip-rel{
+        display: block;
+    }
+
+    &-register{
+        float: right;
+        &-tip{
+            text-align: left;
+            &-low{
+                color: @error-color;
+            }
+            &-medium{
+                color: @warning-color;
+            }
+            &-strong{
+                color: @success-color;
+            }
+            &-title{
+                font-size: @font-size-base;
+            }
+            &-desc{
+                white-space: initial;
+                font-size: @font-size-base;
+                margin-top: 6px;
+            }
+        }
+    }
+    &-to-login{
+        text-align: center;
+        margin-top: 16px;
+    }
+    &-header{
+        text-align: right;
+        position: fixed;
+        top: 16px;
+        right: 24px;
+    }
+}
+
+@media (min-width: @screen-md-min) {
+    .page-account {
+        &:before, &:after{
+            content: '';
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 50%;
+            bottom: 0;
+            z-index: -1;
+            background-image: url('../../assets/images/bg-login-left.png');
+            background-repeat: no-repeat;
+            background-position: bottom;
+            background-size: 100%;
+        }
+        &:after{
+            left: 50%;
+            right: 0;
+            background-image: url('../../assets/images/bg-login-right.png');
+        }
+    }
+
+    .page-account-container {
+        padding: 32px 0 24px 0;
+    }
+}

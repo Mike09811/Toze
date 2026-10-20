@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  backend:
+    name: Go 后端
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache-dependency-path: server/go.sum
+      - name: 依赖
+        run: go mod download
+      - name: 静态检查
+        run: go vet ./...
+      - name: 单元 + 接口测试
+        run: go test ./... -race -count=1
+
+  frontend:
+    name: Vue 前端
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: 安装依赖
+        run: npm ci --no-audit --no-fund
+      - name: 构建
+        env:
+          NODE_OPTIONS: --openssl-legacy-provider
+        run: npm run build
