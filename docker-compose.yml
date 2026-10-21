@@ -41,6 +41,7 @@ services:
       PAAS_AES_KEY: ${PAAS_AES_KEY:-}
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
       TZ: Asia/Shanghai
     ports:
       - "8088:8088"

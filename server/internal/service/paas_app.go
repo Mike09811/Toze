@@ -268,6 +268,8 @@ func (l *paasLiveLog) flush() {
 
 // buildDeployScript 拼接部署脚本，所有动态值均单引号包裹。
 // 镜像模式直接 docker run；GitHub 模式先在服务器上 clone + docker build。
+// 无感切换：新版本先在临时端口启动并完成就绪检查（TCP 可连通），
+// 确认可用后才移除旧容器并用同镜像秒级拉起正式容器；失败则旧版本不受影响。
 func (s *PaasService) buildDeployScript(app *model.PaasApp, githubToken string) string {
 	var b strings.Builder
 	b.WriteString("set -e\n")
@@ -293,17 +295,49 @@ func (s *PaasService) buildDeployScript(app *model.PaasApp, githubToken string) 
 		b.WriteString("docker build --build-arg GOPROXY=https://goproxy.cn,direct -t " + sshx.Quote(image) + " .\n")
 	}
 
+	// 公共 run 参数（不含 --name 与 -p 的端口表达式）
+	runArgs := func(portExpr string) string {
+		var r strings.Builder
+		r.WriteString(" --restart " + sshx.Quote(app.Restart))
+		r.WriteString(" -p '" + portExpr + ":" + strconv.Itoa(app.ContainerPort) + "'")
+		for _, e := range decodeJSONStrings(app.Env) {
+			r.WriteString(" -e " + sshx.Quote(e))
+		}
+		for _, v := range decodeJSONStrings(app.Volumes) {
+			r.WriteString(" -v " + sshx.Quote(v))
+		}
+		r.WriteString(" " + sshx.Quote(image))
+		return r.String()
+	}
+
+	nextName := app.Name + "-next"
+	b.WriteString("NEXT=" + sshx.Quote(nextName) + "\n")
+	b.WriteString("docker rm -f \"$NEXT\" >/dev/null 2>&1 || true\n")
+	// 随机挑一个可绑定的临时端口
+	b.WriteString("TMP_PORT=\"\"\n")
+	b.WriteString("for P in $(shuf -i 20000-45000 -n 5); do\n")
+	b.WriteString("    if docker run -d --name \"$NEXT\"" + runArgs("$P") + " >/dev/null 2>&1; then TMP_PORT=$P; break; fi\n")
+	b.WriteString("    docker rm -f \"$NEXT\" >/dev/null 2>&1 || true\n")
+	b.WriteString("done\n")
+	b.WriteString("if [ -z \"$TMP_PORT\" ]; then echo 临时端口分配失败; exit 1; fi\n")
+	b.WriteString("echo \"--> 新版本已启动（临时端口 $TMP_PORT），等待就绪...\"\n")
+	// 就绪检查：容器存活 + TCP 可连通，最多 90 秒；失败保留旧版本
+	b.WriteString("READY=0\n")
+	b.WriteString("for I in $(seq 1 90); do\n")
+	b.WriteString("    if [ \"$(docker inspect -f {{.State.Status}} \"$NEXT\" 2>/dev/null)\" = running ] && (echo > /dev/tcp/127.0.0.1/\"$TMP_PORT\") 2>/dev/null; then READY=1; break; fi\n")
+	b.WriteString("    sleep 1\n")
+	b.WriteString("done\n")
+	b.WriteString("if [ \"$READY\" != 1 ]; then\n")
+	b.WriteString("    echo !! 新容器90秒内未就绪，保留旧版本不动。新容器日志：\n")
+	b.WriteString("    docker logs --tail 50 \"$NEXT\" 2>&1 || true\n")
+	b.WriteString("    docker rm -f \"$NEXT\" >/dev/null 2>&1 || true\n")
+	b.WriteString("    exit 1\n")
+	b.WriteString("fi\n")
+	b.WriteString("echo --> 新版本就绪，切换流量\n")
+	// 替换：镜像已验证并预热，正式容器秒级启动，业务中断约 1 秒以内
 	b.WriteString("docker rm -f " + sshx.Quote(app.Name) + " >/dev/null 2>&1 || true\n")
-	b.WriteString("cid=$(docker run -d --name " + sshx.Quote(app.Name))
-	b.WriteString(" --restart " + sshx.Quote(app.Restart))
-	b.WriteString(" -p " + sshx.Quote(strconv.Itoa(app.HostPort)+":"+strconv.Itoa(app.ContainerPort)))
-	for _, e := range decodeJSONStrings(app.Env) {
-		b.WriteString(" -e " + sshx.Quote(e))
-	}
-	for _, v := range decodeJSONStrings(app.Volumes) {
-		b.WriteString(" -v " + sshx.Quote(v))
-	}
-	b.WriteString(" " + sshx.Quote(image) + ")\n")
+	b.WriteString("cid=$(docker run -d --name " + sshx.Quote(app.Name) + runArgs(strconv.Itoa(app.HostPort)) + ")\n")
+	b.WriteString("docker rm -f \"$NEXT\" >/dev/null 2>&1 || true\n")
 	b.WriteString("echo \"$cid\"\n")
 	return b.String()
 }

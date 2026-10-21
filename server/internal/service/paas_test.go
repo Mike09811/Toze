@@ -80,7 +80,7 @@ func newPaasTestService(t *testing.T) (*PaasService, *fakeExec, *gorm.DB) {
 		repository.NewPaasAppRepository(db),
 		repository.NewPaasDomainRepository(db),
 		repository.NewPaasGitHubAccountRepository(db),
-		"test-aes-key", "", "",
+		"test-aes-key", "", "", "",
 		slog.New(slog.NewTextHandler(io.Discard, nil)),
 	)
 	svc.SetExec(fake.exec)

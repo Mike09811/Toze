@@ -75,6 +75,8 @@ type PaaSConfig struct {
 	// 留空则无法一键授权，但仍可通过仓库全名构建公开仓库
 	GitHubClientID     string
 	GitHubClientSecret string
+	// GitHub push webhook 校验密钥（可选），对应仓库 webhook 配置里的 Secret
+	GitHubWebhookSecret string
 }
 
 // Load 读取配置，envFile 不存在时忽略。
@@ -125,9 +127,10 @@ func Load(envFile string) (*Config, error) {
 			Format: getString("LOG_FORMAT", "text"),
 		},
 		PaaS: PaaSConfig{
-			AESKey:             getString("PAAS_AES_KEY", ""),
-			GitHubClientID:     getString("GITHUB_CLIENT_ID", ""),
-			GitHubClientSecret: getString("GITHUB_CLIENT_SECRET", ""),
+			AESKey:              getString("PAAS_AES_KEY", ""),
+			GitHubClientID:      getString("GITHUB_CLIENT_ID", ""),
+			GitHubClientSecret:  getString("GITHUB_CLIENT_SECRET", ""),
+			GitHubWebhookSecret: getString("GITHUB_WEBHOOK_SECRET", ""),
 		},
 	}
 

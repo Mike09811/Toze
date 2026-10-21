@@ -117,3 +117,10 @@ func (r *PaasAppRepository) Update(a *model.PaasApp) error { return r.db.Save(a)
 
 // Delete 删除。
 func (r *PaasAppRepository) Delete(id uint64) error { return r.db.Delete(&model.PaasApp{}, id).Error }
+
+// ListBySource 按 GitHub 仓库与分支查找应用（webhook 自动部署用）。
+func (r *PaasAppRepository) ListBySource(repo, branch string) ([]model.PaasApp, error) {
+	var apps []model.PaasApp
+	err := r.db.Where("source_repo = ? AND source_branch = ?", repo, branch).Find(&apps).Error
+	return apps, err
+}

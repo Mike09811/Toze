@@ -171,6 +171,37 @@ func (s *PaasService) resolveGitHubToken(accountID uint64) (token, login string,
 	return plain, account.Login, nil
 }
 
+// GitHubWebhookDTO webhook 处理结果。
+type GitHubWebhookDTO struct {
+	Triggered []string `json:"triggered"` // 触发部署的应用名
+	Skipped   string   `json:"skipped"`   // 跳过原因（如正在部署中）
+}
+
+// HandleGitHubWebhook 处理 push 事件：匹配 repo + branch 的应用自动重新部署。
+func (s *PaasService) HandleGitHubWebhook(repo, branch string) (*GitHubWebhookDTO, error) {
+	if repo == "" || branch == "" {
+		return nil, errcode.New(errcode.InvalidParams, "webhook 载荷缺少仓库或分支信息")
+	}
+	apps, err := s.apps.ListBySource(repo, branch)
+	if err != nil {
+		return nil, err
+	}
+	out := &GitHubWebhookDTO{Triggered: []string{}, Skipped: ""}
+	for i := range apps {
+		if apps[i].Status == model.PaasAppDeploying {
+			out.Skipped += apps[i].Name + " 正在部署中，已跳过；"
+			continue
+		}
+		if err := s.DeployApp(apps[i].ID); err != nil {
+			out.Skipped += apps[i].Name + ": " + err.Error() + "；"
+			continue
+		}
+		out.Triggered = append(out.Triggered, apps[i].Name)
+	}
+	s.log.Info("GitHub webhook", "repo", repo, "branch", branch, "triggered", out.Triggered, "skipped", out.Skipped)
+	return out, nil
+}
+
 // ToGitHubAccountDTO 模型转响应。
 func ToGitHubAccountDTO(a *model.PaasGitHubAccount) GitHubAccountDTO {
 	return GitHubAccountDTO{

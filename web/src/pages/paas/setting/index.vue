@@ -40,6 +40,20 @@
                 支持授权多个账号；应用构建时可指定账号，未指定时使用默认账号。公开仓库无需授权。
             </div>
         </Card>
+        <Card :bordered="false" dis-hover class="ivu-mt">
+            <div slot="title">
+                <Icon type="md-git-commit" class="ivu-mr-8" />
+                自动部署（GitHub Webhook）
+            </div>
+            <p class="page-paas-muted ivu-mb-8">
+                在 GitHub 仓库 → Settings → Webhooks → Add webhook 中填入以下地址，触发事件选 <code>pushes</code>：
+            </p>
+            <div class="page-paas-setting-webhook"><code>{{ webhookUrl }}</code></div>
+            <p class="page-paas-muted ivu-mt-8">
+                对应分支的应用将在推送后自动重新部署；部署采用无感切换——新版本构建并就绪之后才替换旧容器，构建失败则旧版本继续服务。
+                Secret 可留空；如需校验，在服务器 <code>.env</code> 配置 <code>GITHUB_WEBHOOK_SECRET</code> 并填入相同值。
+            </p>
+        </Card>
     </div>
 </template>
 <script>
@@ -66,6 +80,9 @@
         computed: {
             appOrigin () {
                 return window.location.origin;
+            },
+            webhookUrl () {
+                return `${window.location.origin}/api/paas/github/webhook`;
             },
             callbackUrl () {
                 return `${window.location.origin}/api/paas/github/callback`;

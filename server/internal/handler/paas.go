@@ -2,7 +2,13 @@ package handler
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"io"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -495,6 +501,51 @@ func (h *PaasHandler) GitHubRepos(c *gin.Context) {
 		return
 	}
 	response.OK(c, repos)
+}
+
+func (h *PaasHandler) webhookSecret() string { return h.svc.WebhookSecret() }
+
+func hmacSHA256(key string, body []byte) []byte {
+	mac := hmac.New(sha256.New, []byte(key))
+	mac.Write(body)
+	return mac.Sum(nil)
+}
+
+// GitHubWebhook POST /api/paas/github/webhook（GitHub push 事件回调，公开）
+// 服务端配置 GITHUB_WEBHOOK_SECRET 后校验 X-Hub-Signature-256，未配置则直接信任。
+func (h *PaasHandler) GitHubWebhook(c *gin.Context) {
+	body, err := io.ReadAll(io.LimitReader(c.Request.Body, 1<<20))
+	if err != nil {
+		c.String(http.StatusBadRequest, "read body: %v", err)
+		return
+	}
+	if secret := h.webhookSecret(); secret != "" {
+		sig := "sha256=" + hex.EncodeToString(hmacSHA256(secret, body))
+		if !hmac.Equal([]byte(sig), []byte(c.GetHeader("X-Hub-Signature-256"))) {
+			c.String(http.StatusUnauthorized, "签名校验失败")
+			return
+		}
+	}
+	var payload struct {
+		Ref        string `json:"ref"`
+		Repository struct {
+			FullName string `json:"full_name"`
+		} `json:"repository"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		c.String(http.StatusBadRequest, "解析载荷失败: %v", err)
+		return
+	}
+	branch := strings.TrimPrefix(payload.Ref, "refs/heads/")
+	if branch == payload.Ref && !strings.HasPrefix(payload.Ref, "refs/heads/") {
+		branch = "" // 非 branch push（如 tag），忽略
+	}
+	result, err := h.svc.HandleGitHubWebhook(payload.Repository.FullName, branch)
+	if err != nil {
+		response.FailErr(c, err)
+		return
+	}
+	response.OK(c, result)
 }
 
 // GitHubCallback GET /api/paas/github/callback（浏览器 OAuth 回调，公开）

@@ -62,6 +62,7 @@ type PaasService struct {
 	// GitHub OAuth 应用凭证，留空表示未配置（仍可构建公开仓库）
 	githubClientID     string
 	githubClientSecret string
+	webhookSecret      string
 	exec               SSHExec
 	execStream         SSHExecStream
 }
@@ -72,18 +73,22 @@ func NewPaasService(
 	apps *repository.PaasAppRepository,
 	domains *repository.PaasDomainRepository,
 	accounts *repository.PaasGitHubAccountRepository,
-	aesKey, githubClientID, githubClientSecret string,
+	aesKey, githubClientID, githubClientSecret, webhookSecret string,
 	log *slog.Logger,
 ) *PaasService {
 	s := &PaasService{
 		servers: servers, apps: apps, domains: domains, accounts: accounts,
 		log: log, aesKey: aesKey,
 		githubClientID: githubClientID, githubClientSecret: githubClientSecret,
+		webhookSecret: webhookSecret,
 	}
 	s.exec = defaultSSHExec
 	s.execStream = defaultSSHExecStream
 	return s
 }
+
+// WebhookSecret GitHub webhook 校验密钥（空表示不校验）。
+func (s *PaasService) WebhookSecret() string { return s.webhookSecret }
 
 // SetExec 替换脚本执行器（测试注入用）。
 func (s *PaasService) SetExec(fn SSHExec) { s.exec = fn }

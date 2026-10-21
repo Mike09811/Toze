@@ -61,6 +61,8 @@ func New(d Deps) *gin.Engine {
 	api.POST("/login", middleware.RateLimit(10, time.Minute), d.Handler.Auth.Login)
 	// GitHub OAuth 浏览器回调（带 code 换 token），无需登录态
 	api.GET("/paas/github/callback", d.Handler.Paas.GitHubCallback)
+	// GitHub push webhook（自动部署），无需登录态，HMAC 可选校验
+	api.POST("/paas/github/webhook", d.Handler.Paas.GitHubWebhook)
 	api.POST("/register", middleware.RateLimit(5, time.Minute), d.Handler.Auth.Register)
 
 	secured := api.Group("")

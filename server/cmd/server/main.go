@@ -80,7 +80,7 @@ func main() {
 	i18nSvc := service.NewI18nService(i18nRepo)
 	logSvc := service.NewLogService(logRepo)
 	paasSvc := service.NewPaasService(paasServerRepo, paasAppRepo, paasDomainRepo, paasGitHubAccountRepo,
-		cfg.PaaS.AESKey, cfg.PaaS.GitHubClientID, cfg.PaaS.GitHubClientSecret, log)
+		cfg.PaaS.AESKey, cfg.PaaS.GitHubClientID, cfg.PaaS.GitHubClientSecret, cfg.PaaS.GitHubWebhookSecret, log)
 	if cfg.PaaS.AESKey == "" {
 		log.Warn("PAAS_AES_KEY 未配置，PaaS 服务器凭证将无法加密保存，请尽快在 .env 中设置")
 	}
