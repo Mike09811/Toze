@@ -18,7 +18,7 @@
                 <Button icon="md-refresh" class="ivu-ml-8" @click="loadApp">刷新</Button>
                 <Button icon="md-arrow-back" class="ivu-ml-8" @click="$router.push({ name: 'paas-app' })">返回列表</Button>
             </div>
-            <Tabs :value="activeTab" @on-click="handleTabChange">
+            <Tabs v-model="activeTab" @on-click="handleTabChange">
                 <TabPane label="基本信息" name="info">
                     <Row :gutter="16" class="ivu-mt-8">
                         <Col span="12" v-for="item in infoItems" :key="item.label">
