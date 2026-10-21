@@ -63,6 +63,8 @@ sudo docker compose up -d --build
 
 ## 使用流程
 
+0. **中间件一键部署**：新建应用时点「MySQL 8 / Redis 7 / PostgreSQL 16」模板，自动填好镜像、随机密码、命名数据卷与健康检查端口，部署即用
+
 1. **服务器管理** → 添加服务器（IP / SSH 端口 / 账号 / 密码或私钥，凭证 AES-GCM 加密落库、永不回传）
 2. 点「初始化」自动安装 Docker + Caddy（Debian/Ubuntu，支持非 root 用户）
 3. **应用管理** → 新建应用（镜像、端口映射、环境变量、数据卷）→ 部署

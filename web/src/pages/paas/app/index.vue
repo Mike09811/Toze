@@ -22,6 +22,9 @@
                 <template #source="{ row }">
                     <code v-if="row.source_repo">{{ row.source_repo }}#{{ row.source_branch || 'main' }}</code>
                     <code v-else>{{ row.image }}</code>
+                    <Tooltip v-if="!(row.volumes && row.volumes.length)" content="未挂载数据卷：容器重建时数据会丢失" placement="top">
+                        <Icon type="ios-warning" class="page-paas-novol" />
+                    </Tooltip>
                 </template>
                 <template #lastError="{ row }">
                     <Tooltip v-if="row.last_error" :content="row.last_error" placement="top" max-width="400">
@@ -68,6 +71,12 @@
             :loading="modal.submitting"
             @on-ok="handleSubmit"
         >
+            <div class="ivu-mb-16" v-if="!modal.isEdit">
+                <span class="page-paas-muted">快速开始：</span>
+                <Button size="small" class="ivu-ml-8" @click="applyTemplate('mysql')">MySQL 8</Button>
+                <Button size="small" class="ivu-ml-8" @click="applyTemplate('redis')">Redis 7</Button>
+                <Button size="small" class="ivu-ml-8" @click="applyTemplate('postgres')">PostgreSQL 16</Button>
+            </div>
             <Alert v-if="form.sourceType === 'github' && accounts.length === 0" type="warning" show-icon class="ivu-mb-16">
                 <template #desc>
                     尚未授权 GitHub 账号：可直接构建公开仓库；私有仓库请先到
@@ -270,6 +279,25 @@
                     this.servers = res.list;
                 });
             },
+            applyTemplate (kind) {
+                const name = kind === 'mysql' ? 'mysql' : (kind === 'redis' ? 'redis' : 'postgres');
+                const rand = () => Math.random().toString(16).slice(2, 10) + Math.random().toString(16).slice(2, 10);
+                this.form = this.defaultForm();
+                this.form.name = name;
+                this.form.sourceType = 'image';
+                this.form.image = {
+                    mysql: 'mysql:8.0',
+                    redis: 'redis:7-alpine',
+                    postgres: 'postgres:16-alpine'
+                }[kind];
+                this.form.container_port = { mysql: 3306, redis: 6379, postgres: 5432 }[kind];
+                this.form.host_port = { mysql: 13306, redis: 16379, postgres: 15432 }[kind];
+                this.form.volumes = [`${name}-data:${{ mysql: '/var/lib/mysql', redis: '/data', postgres: '/var/lib/postgresql/data' }[kind]}`];
+                if (kind === 'mysql') this.form.envText = `MYSQL_ROOT_PASSWORD=${rand()}
+TZ=Asia/Shanghai`;
+                if (kind === 'postgres') this.form.envText = `POSTGRES_PASSWORD=${rand()}`;
+                this.$Message.info(`模板已填入，密码已随机生成，请记好（表单环境变量中可见）`);
+            },
             handleOpenCreate () {
                 this.form = this.defaultForm();
                 this.modal.isEdit = false;
@@ -407,6 +435,10 @@
         }
         &-danger {
             color: #ed4014;
+        }
+        &-novol {
+            color: #ff9900;
+            margin-left: 4px;
         }
         &-logs {
             max-height: 420px;

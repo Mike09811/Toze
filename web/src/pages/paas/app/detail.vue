@@ -51,6 +51,9 @@
                     <Alert type="error" class="ivu-mt-16" v-if="app.last_error">
                         <template #desc><b>最近错误：</b>{{ app.last_error }}</template>
                     </Alert>
+                    <Alert type="warning" class="ivu-mt-16" v-if="!(app.volumes && app.volumes.length)">
+                        <template #desc>该应用未挂载数据卷，容器重建（重新部署）时容器内写入的数据会丢失。编辑应用添加如 <code>应用名-data:/数据目录</code> 的卷。</template>
+                    </Alert>
                 </TabPane>
                 <TabPane label="构建日志" name="build">
                     <div class="page-paas-detail-toolbar">
