@@ -338,8 +338,10 @@ func (s *PaasService) buildDeployScript(app *model.PaasApp, githubToken string) 
 	b.WriteString("if [ -z \"$TMP_PORT\" ]; then echo 临时端口分配失败; exit 1; fi\n")
 	b.WriteString("echo \"--> 新版本已启动（临时端口 $TMP_PORT），等待就绪...\"\n")
 	// 就绪检查：容器存活 + TCP 可连通，最多 90 秒；失败保留旧版本
-	// 镜像自带 HEALTHCHECK 时以 healthy 为准（数据库类镜像），否则 running + TCP
+	// 镜像自带 HEALTHCHECK 时以 healthy 为准（数据库类镜像）；
+	// 否则 running + 直连容器内网 IP 的容器端口（宿主端口映射有 docker-proxy 兜底，连宿主端口永远通，测不出真实状态）
 	b.WriteString("HAS_HC=$(docker inspect -f '{{if .Config.Healthcheck}}1{{end}}' \"$NEXT\" 2>/dev/null || true)\n")
+	b.WriteString("CIP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' \"$NEXT\" 2>/dev/null)\n")
 	// 就绪等待：每 5 秒把新容器新增日志转储进构建日志（| 前缀），应用报错即时可见
 	b.WriteString("READY=0\n")
 	b.WriteString("SINCE=0\n")
@@ -347,7 +349,7 @@ func (s *PaasService) buildDeployScript(app *model.PaasApp, githubToken string) 
 	b.WriteString("    STATE=$(docker inspect -f {{.State.Status}} \"$NEXT\" 2>/dev/null)\n")
 	b.WriteString("    if [ \"$HAS_HC\" = 1 ]; then\n")
 	b.WriteString("        if [ \"$(docker inspect -f '{{.State.Health.Status}}' \"$NEXT\" 2>/dev/null)\" = healthy ]; then READY=1; break; fi\n")
-	b.WriteString("    elif [ \"$STATE\" = running ] && (echo > /dev/tcp/127.0.0.1/\"$TMP_PORT\") 2>/dev/null; then READY=1; break; fi\n")
+	b.WriteString("    elif [ \"$STATE\" = running ] && [ -n \"$CIP\" ] && (echo > /dev/tcp/\"$CIP\"/" + strconv.Itoa(app.ContainerPort) + " ) 2>/dev/null; then READY=1; break; fi\n")
 	b.WriteString("    if [ \"$STATE\" = exited ] || [ \"$STATE\" = dead ]; then break; fi\n")
 	b.WriteString("    if [ $((I % 5)) = 0 ]; then docker logs --since \"${SINCE}s\" \"$NEXT\" 2>&1 | sed 's/^/    | /' || true; SINCE=5; fi\n")
 	b.WriteString("    sleep 1\n")
