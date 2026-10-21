@@ -131,7 +131,7 @@
                 <Row :gutter="16">
                     <Col span="8">
                         <FormItem prop="host_port" label="宿主机端口">
-                            <InputNumber v-model="form.host_port" :min="1" :max="65535" style="width: 100%" />
+                            <InputNumber v-model="form.host_port" :min="1" :max="65535" style="width: 100%" placeholder="避开控制台的 8080/8088" />
                         </FormItem>
                     </Col>
                     <Col span="8">
@@ -229,7 +229,7 @@
                     source_branch: 'main',
                     source_account_id: 0,
                     container_port: 80,
-                    host_port: 8080,
+                    host_port: 18080,
                     restart: 'always',
                     envText: '',
                     volumeText: ''
