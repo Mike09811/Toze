@@ -251,10 +251,10 @@ func (l *paasLiveLog) Write(p []byte) (int, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	n, err := l.buf.Write(p)
-	// 节流：每 2 秒落库一次
+	// 节流：每 2 秒同步落库一次（避免异步竞态覆盖终态日志）
 	if time.Since(l.lastAt) > 2*time.Second {
 		l.lastAt = time.Now()
-		go l.apps.UpdateDeployLog(l.appID, l.buf.String())
+		_ = l.apps.UpdateDeployLog(l.appID, l.buf.String())
 	}
 	return n, err
 }
