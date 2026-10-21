@@ -2,7 +2,7 @@
  * 菜单
  * */
 import { cloneDeep } from 'lodash';
-import { includeArray, setNativeMenuSider, setNativeMenuHeader, getHeaderName, getMenuSider, getSiderSubmenu, getNativeMenuSider, getNativeMenuHeader } from '@/libs/system';
+import { includeArray, setNativeMenuSider, setNativeMenuHeader, getHeaderName, getMenuSider, getSiderSubmenu, getNativeMenuSider, getNativeMenuHeader, getMatchedPath } from '@/libs/system';
 import router from '@/router';
 import { MenuList } from '@api/menu';
 import Setting from '@/setting';
@@ -25,6 +25,17 @@ function filterMenu (menuList, access, lastList) {
     });
     return lastList;
 }
+
+// 内置兜底菜单：菜单接口异常或返回空数据时使用，保证核心导航永远可用
+const fallbackMenus = {
+    header: [{ title: '首页', path: '/', name: 'home' }],
+    sider: [
+        { title: '服务器管理', path: '/paas/server', icon: 'md-server', header: 'home' },
+        { title: '应用管理', path: '/paas/app', icon: 'md-apps', header: 'home' },
+        { title: '域名管理', path: '/paas/domain', icon: 'md-globe', header: 'home' },
+        { title: '系统设置', path: '/paas/setting', icon: 'md-settings', header: 'home' }
+    ]
+};
 
 export default {
     namespaced: true,
@@ -239,7 +250,7 @@ export default {
 
                 const filterMenuSider = getMenuSider(menuSiderList, headerName);
                 commit('setSider', filterMenuSider);
-                commit('setActivePath', to.path);
+                commit('setActivePath', getMatchedPath(to.path, menuSiderList));
 
                 const openNames = getSiderSubmenu(path, menuSiderList);
                 commit('setOpenNames', openNames);
@@ -254,6 +265,10 @@ export default {
             return new Promise((resolve, reject) => {
                 MenuList()
                     .then(res => {
+                        if (!res || !res.sider || !res.sider.length) {
+                            // 空菜单数据不可写入，否则会把可用导航清空
+                            res = fallbackMenus;
+                        }
                         setNativeMenuHeader(res.header);
                         setNativeMenuSider(res.sider);
                         if (loadMenu) {

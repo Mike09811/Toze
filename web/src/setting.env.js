@@ -1,5 +1,5 @@
 /**
- * Admin Plus 开发配置
+ * Toze 开发配置
  * */
 
 const env = process.env.NODE_ENV;

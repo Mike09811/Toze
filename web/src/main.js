@@ -62,8 +62,23 @@ const app = createApp({
             if (Setting.dynamicMenu) {
                 if (isFirstRouteChange) {
                     isFirstRouteChange = false;
-                    // 每次进入 app 时，获取一次菜单
-                    this.$store.dispatch('admin/menu/getMenuList', to);
+                    // 每次进入 app 时，获取一次菜单；失败（后端重启/网络抖动）时自动重试，
+                    // 避免侧边栏永久空白
+                    let retryCount = 0;
+                    const loadMenus = () => {
+                        this.$store.dispatch('admin/menu/getMenuList', true).catch(() => {
+                            if (retryCount >= 10) return;
+                            retryCount++;
+                            isFirstRouteChange = true;
+                            setTimeout(() => {
+                                if (isFirstRouteChange) {
+                                    isFirstRouteChange = false;
+                                    loadMenus();
+                                }
+                            }, 3000);
+                        });
+                    };
+                    loadMenus();
                 }
             }
 

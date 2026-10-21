@@ -196,7 +196,7 @@
                 <Row :gutter="32">
                     <Col span="12">
                         <FormItem prop="region" label="地区">
-                            <!--地区选择器组件是物料市场内容，需要额外付费购买，Admin Plus 用户免费享有。购买的 Admin Plus 中不包含地区选择器。-->
+                            <!--地区选择器组件是物料市场内容，需要额外付费购买，Toze 用户免费享有。购买的 Toze 中不包含地区选择器。-->
                             <!--行政区域选择组件：https://www.iviewui.com/store/item/1247106998852521984-->
                             <!--<i-region class="page-sys-user-drawer-form-region" v-model="userInfo.region" type="district" data-type="name" placeholder="请选择地区" />-->
                         </FormItem>
@@ -209,7 +209,7 @@
                     <Col span="24">
                         <Alert type="warning" show-icon>
                             <template #desc>
-                                地区选择器组件是物料市场内容，需要额外付费购买，Admin Plus 用户免费享有。购买的 Admin Plus 中不包含地区选择器。
+                                地区选择器组件是物料市场内容，需要额外付费购买，Toze 用户免费享有。购买的 Toze 中不包含地区选择器。
                             </template>
                         </Alert>
                     </Col>

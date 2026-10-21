@@ -1,8 +1,7 @@
 <template>
-    <i-link class="i-layout-header-logo" :class="{ 'i-layout-header-logo-stick': !isMobile }" to="/">
-        <img src="@/assets/images/logo-small.png" v-if="isMobile">
-        <img src="@/assets/images/logo.png" v-else-if="headerTheme === 'light'">
-        <img src="@/assets/images/logo-dark.png" v-else>
+    <i-link class="i-layout-header-logo toze-logo" :class="{ 'i-layout-header-logo-stick': !isMobile }" to="/">
+        <Icon type="md-rocket" class="toze-logo-icon" />
+        <span class="toze-logo-name" v-if="!isMobile">Toze</span>
     </i-link>
 </template>
 <script>

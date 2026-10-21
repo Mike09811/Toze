@@ -1,5 +1,5 @@
 /**
- * Admin Plus 业务配置
+ * Toze 业务配置
  * */
 
 const env = process.env.NODE_ENV;
@@ -11,7 +11,7 @@ const Setting = {
     // 项目的 ID
     appID: 'app',
     // 网页标题的后缀，不需要设置为 false 或空
-    titleSuffix: 'Admin Plus',
+    titleSuffix: 'Toze',
     // 路由模式，可选值为 history 或 hash
     routerMode: 'history',
     // 应用的基路径

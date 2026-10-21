@@ -17,7 +17,7 @@ export default {
                 });
                 // 只在开发模式下打印 log
                 if (process.env.NODE_ENV === 'development') {
-                    util.log.capsule('Admin Plus', 'ErrorHandler', 'error');
+                    util.log.capsule('Toze', 'ErrorHandler', 'error');
                     util.log.error('>>>>>> 错误信息 >>>>>>');
                     console.log(info);
                     util.log.error('>>>>>> Vue 实例 >>>>>>');

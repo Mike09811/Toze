@@ -179,6 +179,10 @@ function classifyLogLines (log) {
                 if (tab === 'build') this.startBuildPoll();
                 else this.stopBuildPoll();
                 if (tab === 'runtime' && !this.runtimeLog) this.loadRuntimeLog();
+                // 同步到 URL，刷新后保持当前标签
+                if (this.$route.query.tab !== tab) {
+                    this.$router.replace({ query: { ...this.$route.query, tab } });
+                }
             },
             loadBuildLog () {
                 GetPaasAppDeployLog({ id: this.appId }).then(res => {
@@ -244,6 +248,13 @@ function classifyLogLines (log) {
                         });
                     }
                 });
+            }
+        },
+        watch: {
+            '$route.query.tab' (v) {
+                this.activeTab = v === 'runtime' ? 'runtime' : (v === 'build' ? 'build' : 'info');
+                if (this.activeTab === 'build') this.startBuildPoll();
+                if (this.activeTab === 'runtime') this.loadRuntimeLog();
             }
         },
         mounted () {

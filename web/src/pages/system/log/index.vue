@@ -85,7 +85,7 @@
                     title: '提示',
                     desc: '请在浏览器控制台查看完整日志'
                 });
-                this.$log.capsule('Admin Plus', '完整日志内容', 'primary');
+                this.$log.capsule('Toze', '完整日志内容', 'primary');
                 console.group('完整日志');
                 console.log('message ', log.message);
                 console.log('time: ', log.time);

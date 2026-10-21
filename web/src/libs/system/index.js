@@ -22,7 +22,18 @@ function getHeaderName (currentPath, menuList) {
         menus.forEach(item => allMenus.push(item));
     });
 
-    const currentMenu = allMenus.find(item => item.path === currentPath);
+    let currentMenu = allMenus.find(item => item.path === currentPath);
+    // 前缀匹配：直接刷新/打开隐藏的二级页面（如 /paas/app/detail/2）时，
+    // 也要能定位到所属顶栏菜单，否则侧边栏会空白
+    if (!currentMenu) {
+        const candidates = allMenus.filter(item => item.path !== '/' && currentPath.startsWith(item.path + '/'));
+        candidates.sort((a, b) => b.path.length - a.path.length);
+        currentMenu = candidates[0];
+    }
+    // 兜底：未匹配到时回到首页菜单，保证侧边栏可用
+    if (!currentMenu) {
+        currentMenu = allMenus.find(item => item.path === '/');
+    }
     return currentMenu ? currentMenu.header : null;
 }
 
@@ -57,6 +68,24 @@ function getMenuSider (menuList, headerName = '') {
 }
 
 export { getMenuSider };
+
+/**
+ * @description 根据当前路由找到对应的菜单 path（支持前缀匹配），
+ * 用于侧栏高亮：/paas/app/detail/2 高亮「应用管理」
+ * */
+function getMatchedPath (currentPath, menuList) {
+    const allPaths = [];
+    menuList.forEach(menu => {
+        allPaths.push(menu.path);
+        transferMenu(menu, menu.header || '').forEach(item => allPaths.push(item.path));
+    });
+    if (allPaths.includes(currentPath)) return currentPath;
+    const candidates = allPaths.filter(p => p !== '/' && currentPath.startsWith(p + '/'));
+    candidates.sort((a, b) => b.length - a.length);
+    return candidates[0] || currentPath;
+}
+
+export { getMatchedPath };
 
 /**
  * @description 根据当前路由，找到其所有父菜单 path，作为展开侧边栏 open-names 依据
@@ -167,11 +196,37 @@ export { includeArray };
  * @description 动态菜单相关
  * */
 
+// 部分内嵌浏览器/隐私模式下 localStorage 可能不可用或抛异常，
+// 这里统一做保护并退回到内存缓存，保证侧边栏永远不会因为存储问题而空白。
+const menuStorageCache = {
+    sider: '[]',
+    header: '[]'
+};
+
+function safeStorageSet (key, value) {
+    menuStorageCache[key] = value;
+    try {
+        localStorage.setItem(`admin-plus-${Setting.appID}-menu-${key}`, value);
+    } catch (e) {}
+}
+
+function safeStorageGet (key) {
+    try {
+        const v = localStorage.getItem(`admin-plus-${Setting.appID}-menu-${key}`);
+        if (v) menuStorageCache[key] = v;
+    } catch (e) {}
+    try {
+        return JSON.parse(menuStorageCache[key] || '[]');
+    } catch (e) {
+        return [];
+    }
+}
+
 /**
  * @description 保存动态侧边菜单到本地
  * */
 function setNativeMenuSider (data) {
-    localStorage.setItem(`admin-plus-${Setting.appID}-menu-sider`, JSON.stringify(data));
+    safeStorageSet('sider', JSON.stringify(data || []));
 }
 
 export { setNativeMenuSider };
@@ -180,7 +235,7 @@ export { setNativeMenuSider };
  * @description 读取本地的动态侧边菜单
  * */
 function getNativeMenuSider () {
-    return JSON.parse(localStorage.getItem(`admin-plus-${Setting.appID}-menu-sider`) || '[]');
+    return safeStorageGet('sider');
 }
 
 export { getNativeMenuSider };
@@ -189,7 +244,7 @@ export { getNativeMenuSider };
  * @description 保存动态顶栏菜单到本地
  * */
 function setNativeMenuHeader (data) {
-    localStorage.setItem(`admin-plus-${Setting.appID}-menu-header`, JSON.stringify(data));
+    safeStorageSet('header', JSON.stringify(data || []));
 }
 
 export { setNativeMenuHeader };
@@ -198,7 +253,7 @@ export { setNativeMenuHeader };
  * @description 读取本地的动态顶栏菜单
  * */
 function getNativeMenuHeader () {
-    return JSON.parse(localStorage.getItem(`admin-plus-${Setting.appID}-menu-header`) || '[]');
+    return safeStorageGet('header');
 }
 
 export { getNativeMenuHeader };

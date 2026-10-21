@@ -2,10 +2,9 @@
     <div>
         <div class="i-layout-sider-logo" :class="{ 'i-layout-sider-logo-dark': siderTheme === 'dark' }">
             <transition name="fade-quick">
-                <i-link to="/" v-show="!hideLogo">
-                    <img src="@/assets/images/logo-small.png" v-if="menuCollapse">
-                    <img src="@/assets/images/logo.png" v-else-if="siderTheme === 'light'">
-                    <img src="@/assets/images/logo-dark.png" v-else>
+                <i-link to="/" v-show="!hideLogo" class="toze-logo">
+                    <Icon type="md-rocket" class="toze-logo-icon" />
+                    <span class="toze-logo-name" v-if="!menuCollapse">Toze</span>
                 </i-link>
             </transition>
         </div>
