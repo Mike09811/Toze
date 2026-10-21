@@ -111,6 +111,7 @@ func New(d Deps) *gin.Engine {
 			admin.POST("/paas/server/update", d.Handler.Paas.ServerUpdate)
 			admin.POST("/paas/server/delete", d.Handler.Paas.ServerDelete)
 			admin.POST("/paas/server/test", d.Handler.Paas.ServerTest)
+			admin.POST("/paas/server/resources", d.Handler.Paas.ServerResources)
 			admin.POST("/paas/server/init", d.Handler.Paas.ServerInit)
 
 			admin.POST("/paas/app/create", d.Handler.Paas.AppCreate)
@@ -126,11 +127,13 @@ func New(d Deps) *gin.Engine {
 
 			admin.POST("/paas/domain/create", d.Handler.Paas.DomainCreate)
 			admin.POST("/paas/domain/delete", d.Handler.Paas.DomainDelete)
+			admin.POST("/paas/domain/certs", d.Handler.Paas.ServerDomainCerts)
 
 			admin.POST("/paas/github/auth/url", d.Handler.Paas.GitHubAuthURL)
 			admin.POST("/paas/github/repos", d.Handler.Paas.GitHubRepos)
 			admin.POST("/paas/github/accounts/default", d.Handler.Paas.GitHubSetDefault)
 			admin.POST("/paas/github/accounts/delete", d.Handler.Paas.GitHubDeleteAccount)
+			admin.POST("/paas/github/webhook/setup", d.Handler.Paas.GitHubSetupWebhook)
 		}
 	}
 

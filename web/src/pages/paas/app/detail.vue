@@ -14,6 +14,7 @@
         <Card :bordered="false" dis-hover class="ivu-mt">
             <div slot="extra">
                 <Button type="primary" icon="md-rocket" :disabled="app.status === 3" @click="handleDeploy">部署</Button>
+                <Button icon="md-git-branch" class="ivu-ml-8" v-if="app.source_repo" @click="handleSetupWebhook">开启自动部署</Button>
                 <Button icon="md-refresh" class="ivu-ml-8" @click="loadApp">刷新</Button>
                 <Button icon="md-arrow-back" class="ivu-ml-8" @click="$router.push({ name: 'paas-app' })">返回列表</Button>
             </div>
@@ -91,7 +92,7 @@
     </div>
 </template>
 <script>
-    import { GetPaasAppList, DeployPaasApp, GetPaasAppDeployLog, GetPaasAppLogs } from '@api/paas';
+    import { GetPaasAppList, DeployPaasApp, GetPaasAppDeployLog, GetPaasAppLogs, SetupPaasRepoWebhook } from '@api/paas';
 
 // 日志行分类：error / warn / stage / plain
 const ERROR_RE = /(ERROR|error|Error|FAILED|failed:|failed to|exit code|未就绪|部署失败|!!!!|cannot find|No such|refused|denied)/;
@@ -216,6 +217,17 @@ function classifyLogLines (log) {
                 this.$nextTick(() => {
                     const box = this.$refs[ref];
                     if (box) box.scrollTop = box.scrollHeight;
+                });
+            },
+            handleSetupWebhook () {
+                this.$Modal.confirm({
+                    title: '开启自动部署',
+                    content: `将为仓库 <strong>${this.app.source_repo}</strong> 配置 push webhook，推送代码后自动重新部署（无感切换）。继续？`,
+                    onOk: () => {
+                        SetupPaasRepoWebhook({ repo: this.app.source_repo }).then(res => {
+                            this.$Message.success(res.msg || '自动部署已配置');
+                        });
+                    }
                 });
             },
             handleDeploy () {

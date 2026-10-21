@@ -221,12 +221,12 @@ func (s *PaasService) DeployApp(id uint64) error {
 		live.flush() // 终态：把完整输出写库一次
 		if err != nil {
 			s.log.Error("部署失败", "app", app.Name, "error", err)
-			_ = s.apps.UpdateDeployment(app.ID, "", model.PaasAppUndeployed, err.Error())
+			_ = s.apps.UpdateDeployment(app.ID, "", model.PaasAppUndeployed, classifyDeployError(err))
 			return
 		}
 		cid := lastLine(out)
 		if !paasContainerIDFormat.MatchString(cid) {
-			_ = s.apps.UpdateDeployment(app.ID, "", model.PaasAppUndeployed, "无法解析容器 ID，远程输出: "+strings.TrimSpace(out))
+			_ = s.apps.UpdateDeployment(app.ID, "", model.PaasAppUndeployed, "[平台异常] 无法解析容器 ID，远程输出: "+strings.TrimSpace(out))
 			return
 		}
 		if err := s.apps.UpdateDeployment(app.ID, cid, model.PaasAppRunning, ""); err != nil {
@@ -278,8 +278,9 @@ func (l *paasLiveLog) flush() {
 func (s *PaasService) buildDeployScript(app *model.PaasApp, githubToken string) string {
 	var b strings.Builder
 	b.WriteString("set -e\n")
-	// 任何一步失败都打上醒目终止标记，方便在日志里一眼定位
-	b.WriteString("trap 'echo \"!!!! 部署失败：上方最近的 error/failed 行即为原因\"' ERR\n")
+	// 任何一步失败都打上醒目终止标记并注明阶段，方便在日志里一眼定位与归因
+	b.WriteString("STAGE=部署准备\n")
+	b.WriteString("trap 'echo \"!!!! 部署失败于 [$STAGE] 阶段：上方最近的 error/failed 行即为原因\"' ERR\n")
 
 	image := app.Image
 	if app.SourceRepo != "" {
@@ -293,6 +294,7 @@ func (s *PaasService) buildDeployScript(app *model.PaasApp, githubToken string) 
 		}
 		image = "toze/" + app.Name + ":latest"
 		// 构建目录放登录用户家目录下，root / 普通用户都有写权限；应用名已过白名单校验
+		b.WriteString("STAGE='拉取代码'\n")
 		b.WriteString("echo ==== [1/4] 拉取代码（git clone）====\n")
 		b.WriteString("WORK=\"$HOME\"/toze/build/" + app.Name + "\n")
 		b.WriteString("rm -rf \"$WORK\" && mkdir -p \"$WORK\"\n")
@@ -300,6 +302,7 @@ func (s *PaasService) buildDeployScript(app *model.PaasApp, githubToken string) 
 		// 抹掉 remote 中的 token，避免明文留在服务器的 .git/config
 		b.WriteString("git -C \"$WORK\" remote remove origin\n")
 		b.WriteString("cd \"$WORK\"\n")
+		b.WriteString("STAGE='构建镜像'\n")
 		b.WriteString("echo ==== [2/4] 构建镜像（docker build）====\n")
 		b.WriteString("docker build --build-arg GOPROXY=https://goproxy.cn,direct -t " + sshx.Quote(image) + " .\n")
 	}
@@ -326,6 +329,7 @@ func (s *PaasService) buildDeployScript(app *model.PaasApp, githubToken string) 
 	}
 
 	nextName := app.Name + "-next"
+	b.WriteString("STAGE='新版本启动检查'\n")
 	b.WriteString("echo ==== [3/4] 启动新版本并等待就绪 ====\n")
 	b.WriteString("NEXT=" + sshx.Quote(nextName) + "\n")
 	b.WriteString("docker rm -f \"$NEXT\" >/dev/null 2>&1 || true\n")
@@ -360,6 +364,7 @@ func (s *PaasService) buildDeployScript(app *model.PaasApp, githubToken string) 
 	b.WriteString("    docker rm -f \"$NEXT\" >/dev/null 2>&1 || true\n")
 	b.WriteString("    exit 1\n")
 	b.WriteString("fi\n")
+	b.WriteString("STAGE='切换流量'\n")
 	b.WriteString("echo ==== [4/4] 新版本就绪，切换流量 ====\n")
 	// 替换：镜像已验证并预热，正式容器秒级启动，业务中断约 1 秒以内
 	b.WriteString("docker rm -f " + sshx.Quote(app.Name) + " >/dev/null 2>&1 || true\n")

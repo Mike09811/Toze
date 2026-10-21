@@ -438,3 +438,23 @@ func lastLine(out string) string {
 	}
 	return ""
 }
+
+// classifyDeployError 把原始部署错误归类为「平台问题 / 应用问题」并注明阶段，
+// 让使用者一眼分清是 Toze 的锅还是被部署应用的锅。
+func classifyDeployError(err error) string {
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "拉取代码"):
+		return "[应用侧] 代码拉取失败——检查仓库地址、分支是否存在、私有仓库是否已授权。原始错误: " + msg
+	case strings.Contains(msg, "构建镜像"), strings.Contains(msg, "failed to solve"):
+		return "[应用侧] 镜像构建失败——多为应用的 Dockerfile 或依赖问题，查看构建日志定位。原始错误: " + msg
+	case strings.Contains(msg, "新版本启动检查"), strings.Contains(msg, "未就绪"):
+		return "[应用侧] 新版本启动后未就绪（90 秒内未监听端口或容器退出）——多为应用配置问题，旧版本保持服务。原始错误: " + msg
+	case strings.Contains(msg, "切换流量"):
+		return "[平台侧] 流量切换阶段失败，请把构建日志反馈给平台维护者。原始错误: " + msg
+	case strings.Contains(msg, "解密 SSH 凭证"), strings.Contains(msg, "连接"), strings.Contains(msg, "认证"):
+		return "[平台侧] 服务器连接问题——检查服务器在线状态与 SSH 凭证。原始错误: " + msg
+	default:
+		return "[未分类] " + msg
+	}
+}

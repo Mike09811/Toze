@@ -6,6 +6,7 @@
         <Card :bordered="false" dis-hover class="ivu-mt">
             <Button type="primary" icon="md-add" @click="handleOpenCreate">绑定域名</Button>
             <Button icon="md-refresh" class="ivu-ml-8" @click="getData">刷新</Button>
+            <Button icon="md-ribbon" class="ivu-ml-8" :loading="certLoading" @click="checkCerts">检查证书</Button>
             <Table
                 :columns="columns"
                 :data="list"
@@ -14,6 +15,11 @@
             >
                 <template #domain="{ row }">
                     <a :href="'https://' + row.domain" target="_blank" rel="noopener">{{ row.domain }}</a>
+                </template>
+                <template #cert="{ row }">
+                    <Tag v-if="certs[row.domain] === 'ok'" color="green">已签发</Tag>
+                    <Tag v-else-if="certs[row.domain] === 'pending'" color="orange">签发中/未生效</Tag>
+                    <span v-else>-</span>
                 </template>
                 <template #action="{ row }">
                     <div>
@@ -59,7 +65,7 @@
     </div>
 </template>
 <script>
-    import { GetPaasDomainList, CreatePaasDomain, DeletePaasDomain, GetPaasAppList } from '@api/paas';
+    import { GetPaasDomainList, CreatePaasDomain, DeletePaasDomain, GetPaasAppList, CheckPaasDomainCerts, GetPaasServerList } from '@api/paas';
 
     export default {
         name: 'paas-domain',
@@ -70,6 +76,7 @@
                     { title: '应用', key: 'app_name', minWidth: 120 },
                     { title: '服务器', key: 'server_name', minWidth: 120 },
                     { title: '反代端口', key: 'host_port', width: 100, align: 'center' },
+                    { title: 'HTTPS 证书', slot: 'cert', width: 130, align: 'center' },
                     { title: '绑定时间', key: 'created_at', width: 170 },
                     { title: '操作', slot: 'action', width: 100, align: 'center' }
                 ],
@@ -79,6 +86,8 @@
                 current: 1,
                 limit: 10,
                 total: 0,
+                certs: {},
+                certLoading: false,
                 modal: {
                     show: false,
                     submitting: false
@@ -139,6 +148,19 @@
                     }).catch(() => {
                         this.modal.submitting = false;
                     });
+                });
+            },
+            checkCerts () {
+                this.certLoading = true;
+                GetPaasServerList({ offset: 0, limit: 100 }).then(res => {
+                    const servers = (res.list || []).filter(s => s.app_count > 0);
+                    return Promise.all(servers.map(s => CheckPaasDomainCerts({ server_id: s.id }).then(list => {
+                        (list || []).forEach(item => {
+                            this.certs[item.domain] = item.status;
+                        });
+                    }).catch(() => {})));
+                }).finally(() => {
+                    this.certLoading = false;
                 });
             },
             handleDelete (row) {

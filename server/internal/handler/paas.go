@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/Mike09811/Toze/server/internal/pkg/errcode"
 	"github.com/Mike09811/Toze/server/internal/pkg/response"
 	"github.com/Mike09811/Toze/server/internal/service"
 )
@@ -509,6 +510,65 @@ func hmacSHA256(key string, body []byte) []byte {
 	mac := hmac.New(sha256.New, []byte(key))
 	mac.Write(body)
 	return mac.Sum(nil)
+}
+
+// ServerResources POST /api/paas/server/resources 实时资源
+func (h *PaasHandler) ServerResources(c *gin.Context) {
+	var req deleteReq
+	if !bind(c, &req) {
+		return
+	}
+	id, err := service.ParseID(req.ID)
+	if err != nil {
+		response.FailErr(c, err)
+		return
+	}
+	dto, err := h.svc.ServerResources(c.Request.Context(), id)
+	if err != nil {
+		response.FailErr(c, err)
+		return
+	}
+	response.OK(c, dto)
+}
+
+// GitHubSetupWebhook POST /api/paas/github/webhook/setup 一键为仓库配置自动部署
+func (h *PaasHandler) GitHubSetupWebhook(c *gin.Context) {
+	var req struct {
+		Repo string `json:"repo"`
+	}
+	if !bind(c, &req) {
+		return
+	}
+	base := "http://" + c.Request.Host
+	if proto := c.GetHeader("X-Forwarded-Proto"); proto != "" {
+		base = proto + "://" + c.Request.Host
+	}
+	if err := h.svc.GitHubSetupWebhook(c.Request.Context(), req.Repo, base); err != nil {
+		response.FailErr(c, err)
+		return
+	}
+	response.OKMsg(c, "自动部署已配置：该仓库 push 后将自动重新部署", gin.H{"msg": "ok"})
+}
+
+// ServerDomainCerts POST /api/paas/domain/certs 证书状态批量检查
+func (h *PaasHandler) ServerDomainCerts(c *gin.Context) {
+	var req struct {
+		ServerID string `json:"server_id"`
+	}
+	if !bind(c, &req) {
+		return
+	}
+	id, err := service.ParseID(req.ServerID)
+	if err != nil || id == 0 {
+		response.Fail(c, errcode.InvalidParams, "请选择服务器")
+		return
+	}
+	list, err := h.svc.ServerDomainCerts(c.Request.Context(), id)
+	if err != nil {
+		response.FailErr(c, err)
+		return
+	}
+	response.OK(c, list)
 }
 
 // GitHubWebhook POST /api/paas/github/webhook（GitHub push 事件回调，公开）

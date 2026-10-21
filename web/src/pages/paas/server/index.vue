@@ -6,6 +6,7 @@
         <Card :bordered="false" dis-hover class="ivu-mt">
             <Button type="primary" icon="md-add" @click="handleOpenCreate">添加服务器</Button>
             <Button icon="md-refresh" class="ivu-ml-8" @click="getData">刷新</Button>
+            <Button icon="md-pulse" class="ivu-ml-8" :loading="resLoading" @click="loadAllResources">巡检资源</Button>
             <Table
                 :columns="columns"
                 :data="list"
@@ -22,6 +23,14 @@
                     <Badge v-else color="red" text="离线" />
                 </template>
                 <template #ssh="{ row }">{{ row.ssh_user }}@{{ row.ip }}:{{ row.ssh_port }}</template>
+                <template #res="{ row }">
+                    <span v-if="resources[row.id]">
+                        负载 {{ resources[row.id].load_avg }} / {{ resources[row.id].cores }}核<br />
+                        内存 {{ resources[row.id].mem_used_mb }}/{{ resources[row.id].mem_total_mb }}MB<br />
+                        磁盘 {{ resources[row.id].disk_used_pct }}%
+                    </span>
+                    <span v-else class="page-paas-muted">点「巡检资源」</span>
+                </template>
                 <template #lastError="{ row }">
                     <Tooltip v-if="row.last_error" :content="row.last_error" placement="top" max-width="400">
                         <span class="page-paas-ellipsis page-paas-error">{{ row.last_error }}</span>
@@ -105,7 +114,7 @@
     </div>
 </template>
 <script>
-    import { GetPaasServerList, CreatePaasServer, UpdatePaasServer, DeletePaasServer, TestPaasServer, InitPaasServer } from '@api/paas';
+    import { GetPaasServerList, CreatePaasServer, UpdatePaasServer, DeletePaasServer, TestPaasServer, InitPaasServer, GetPaasServerResources } from '@api/paas';
 
     export default {
         name: 'paas-server',
@@ -114,6 +123,7 @@
                 columns: [
                     { title: '名称', key: 'name', minWidth: 120 },
                     { title: 'SSH', key: 'ssh', slot: 'ssh', minWidth: 200 },
+                    { title: '资源', key: 'res', slot: 'res', minWidth: 170 },
                     { title: '认证', key: 'auth_type', slot: 'authType', width: 90, align: 'center' },
                     { title: '状态', key: 'status', slot: 'status', width: 110, align: 'center' },
                     { title: 'Docker', key: 'docker_ver', width: 110 },
@@ -127,6 +137,8 @@
                 current: 1,
                 limit: 10,
                 total: 0,
+                resources: {},
+                resLoading: false,
                 modal: {
                     show: false,
                     isEdit: false,
@@ -209,6 +221,14 @@
                     }).catch(() => {
                         this.modal.submitting = false;
                     });
+                });
+            },
+            loadAllResources () {
+                this.resLoading = true;
+                Promise.all(this.list.map(row => GetPaasServerResources({ id: row.id }).then(res => {
+                    this.resources[row.id] = res;
+                }).catch(() => {}))).finally(() => {
+                    this.resLoading = false;
                 });
             },
             handleTest (row) {

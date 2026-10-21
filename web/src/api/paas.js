@@ -207,3 +207,27 @@ export function GetPaasAppDeployLog (data) {
         data
     });
 }
+
+export function GetPaasServerResources (data) {
+    return request({
+        url: '/api/paas/server/resources',
+        method: 'post',
+        data
+    });
+}
+
+export function SetupPaasRepoWebhook (data) {
+    return request({
+        url: '/api/paas/github/webhook/setup',
+        method: 'post',
+        data
+    });
+}
+
+export function CheckPaasDomainCerts (data) {
+    return request({
+        url: '/api/paas/domain/certs',
+        method: 'post',
+        data
+    });
+}

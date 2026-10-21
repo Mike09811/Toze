@@ -2,6 +2,7 @@
 package githubx
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -117,4 +118,35 @@ func truncate(s string, n int) string {
 		return s[:n]
 	}
 	return s
+}
+
+// CreateRepoWebhook 为仓库配置 push webhook（幂等：已存在同 URL 的 hook 会报 422，调用方忽略）。
+func CreateRepoWebhook(ctx context.Context, token, repo, callbackURL string) error {
+	payload := map[string]any{
+		"config": map[string]any{
+			"url":          callbackURL,
+			"content_type": "json",
+			"insecure_ssl": "1",
+		},
+		"events": []string{"push"},
+	}
+	body, _ := json.Marshal(payload)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		"https://api.github.com/repos/"+repo+"/hooks", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/vnd.github+json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("请求 GitHub API 失败: %w", err)
+	}
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusUnprocessableEntity {
+		return fmt.Errorf("GitHub 返回 %d: %s", resp.StatusCode, truncate(string(respBody), 200))
+	}
+	return nil
 }
