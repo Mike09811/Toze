@@ -133,6 +133,7 @@
             handleTabChange (tab) {
                 if (tab === 'build') this.startBuildPoll();
                 else this.stopBuildPoll();
+                if (tab === 'runtime' && !this.runtimeLog) this.loadRuntimeLog();
             },
             loadBuildLog () {
                 GetPaasAppDeployLog({ id: this.appId }).then(res => {
@@ -192,6 +193,7 @@
         mounted () {
             this.loadApp();
             if (this.activeTab === 'build') this.startBuildPoll();
+            if (this.activeTab === 'runtime') this.loadRuntimeLog();
         },
         beforeUnmount () {
             this.stopBuildPoll();
