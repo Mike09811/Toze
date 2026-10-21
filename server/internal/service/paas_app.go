@@ -290,7 +290,7 @@ func (s *PaasService) buildDeployScript(app *model.PaasApp, githubToken string) 
 		// 抹掉 remote 中的 token，避免明文留在服务器的 .git/config
 		b.WriteString("git -C \"$WORK\" remote remove origin\n")
 		b.WriteString("cd \"$WORK\"\n")
-		b.WriteString("docker build -t " + sshx.Quote(image) + " .\n")
+		b.WriteString("docker build --build-arg GOPROXY=https://goproxy.cn,direct -t " + sshx.Quote(image) + " .\n")
 	}
 
 	b.WriteString("docker rm -f " + sshx.Quote(app.Name) + " >/dev/null 2>&1 || true\n")

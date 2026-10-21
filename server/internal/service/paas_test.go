@@ -370,7 +370,7 @@ func TestPaasGitHubBuildScript(t *testing.T) {
 	for _, want := range []string{
 		"WORK=\"$HOME\"/toze/build/site",
 		"git clone --depth 1 -b 'main' 'https://x-access-token:tok'\\''en@github.com/docker/getting-started.git'",
-		"docker build -t 'toze/site:latest' .",
+		"docker build --build-arg GOPROXY=https://goproxy.cn,direct -t 'toze/site:latest' .",
 		"git -C \"$WORK\" remote remove origin",
 		"--name 'site'",
 		"-p '18090:3000'",
