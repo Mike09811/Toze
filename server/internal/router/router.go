@@ -119,6 +119,7 @@ func New(d Deps) *gin.Engine {
 			admin.POST("/paas/app/stop", d.Handler.Paas.AppStop)
 			admin.POST("/paas/app/restart", d.Handler.Paas.AppRestart)
 			admin.POST("/paas/app/logs", d.Handler.Paas.AppLogs)
+			admin.POST("/paas/app/deploy-log", d.Handler.Paas.AppDeployLog)
 			admin.POST("/paas/app/status", d.Handler.Paas.AppStatus)
 
 			admin.POST("/paas/domain/create", d.Handler.Paas.DomainCreate)

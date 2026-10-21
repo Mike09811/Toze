@@ -40,6 +40,8 @@
                         <Divider type="vertical" />
                         <a @click="handleLogs(row)">日志</a>
                         <Divider type="vertical" />
+                        <a @click="handleBuildLog(row)">构建日志</a>
+                        <Divider type="vertical" />
                         <a @click="handleEdit(row)">编辑</a>
                         <Divider type="vertical" />
                         <a class="page-paas-danger" @click="handleDelete(row)">删除</a>
@@ -157,6 +159,17 @@
             </Form>
         </Modal>
 
+        <Modal v-model="buildLog.show" :title="`构建日志 - ${buildLog.appName}`" width="820" footer-hide>
+            <div style="margin-bottom: 8px; text-align: right;">
+                <Tag v-if="buildLog.status === 3" color="blue">构建中…</Tag>
+                <Tag v-else-if="buildLog.status === 1" color="green">部署成功，运行中</Tag>
+                <Tag v-else-if="buildLog.status === 0" color="red">部署失败</Tag>
+                <Tag v-else color="gray">已停止</Tag>
+                <Button size="small" icon="md-refresh" :loading="buildLog.loading" @click="loadBuildLog(true)" style="margin-left: 8px;">刷新</Button>
+            </div>
+            <div class="page-paas-logs"><pre ref="buildLogPre">{{ buildLog.content || '暂无日志，构建开始后每 2 秒自动刷新' }}</pre></div>
+        </Modal>
+
         <Modal v-model="logs.show" :title="`日志 - ${logs.appName}`" width="760" footer-hide>
             <div style="margin-bottom: 8px; text-align: right;">
                 <Button size="small" icon="md-refresh" :loading="logs.loading" @click="loadLogs">刷新</Button>
@@ -166,7 +179,7 @@
     </div>
 </template>
 <script>
-    import { GetPaasAppList, CreatePaasApp, UpdatePaasApp, DeletePaasApp, DeployPaasApp, StartPaasApp, StopPaasApp, RestartPaasApp, GetPaasAppLogs, RefreshPaasAppStatus, GetPaasServerList, GetPaasGitHubStatus, GetPaasGitHubRepos } from '@api/paas';
+    import { GetPaasAppList, CreatePaasApp, UpdatePaasApp, DeletePaasApp, DeployPaasApp, StartPaasApp, StopPaasApp, RestartPaasApp, GetPaasAppLogs, RefreshPaasAppStatus, GetPaasServerList, GetPaasGitHubStatus, GetPaasGitHubRepos, GetPaasAppDeployLog } from '@api/paas';
 
     export default {
         name: 'paas-app',
@@ -225,6 +238,15 @@
                 accounts: [],
                 repos: [],
                 reposLoaded: false,
+                buildLog: {
+                    show: false,
+                    appName: '',
+                    appId: '',
+                    status: 0,
+                    content: '',
+                    loading: false,
+                    timer: null
+                },
                 pollTimer: null
             };
         },
@@ -318,7 +340,7 @@
                         image: this.form.sourceType === 'image' ? this.form.image : '',
                         source_repo: this.form.sourceType === 'github' ? this.form.source_repo : '',
                         source_branch: this.form.sourceType === 'github' ? this.form.source_branch : '',
-                        source_account_id: this.form.sourceType === 'github' ? this.form.source_account_id : 0,
+                        source_account_id: this.form.sourceType === 'github' ? (this.form.source_account_id || '') : '',
                         container_port: this.form.container_port,
                         host_port: this.form.host_port,
                         restart: this.form.restart,
@@ -346,8 +368,9 @@
                         content: `将在 <strong>${row.server_name}</strong> 上（重新）部署 <strong>${row.name}</strong>，旧容器会被移除。镜像拉取可能需要几分钟。`,
                         onOk: () => {
                             api({ id: row.id }).then(() => {
-                                this.$Message.success('部署已开始，列表会自动刷新进度');
+                                this.$Message.success('部署已开始');
                                 this.getData();
+                                this.handleBuildLog(row);
                             });
                         }
                     });
@@ -357,6 +380,45 @@
                     this.$Message.success('操作成功');
                     this.getData();
                 });
+            },
+            handleBuildLog (row) {
+                this.buildLog.appName = row.name;
+                this.buildLog.appId = row.id;
+                this.buildLog.status = row.status;
+                this.buildLog.content = '';
+                this.buildLog.show = true;
+                this.loadBuildLog(true);
+                this.startBuildLogPoll();
+            },
+            loadBuildLog (manual) {
+                this.buildLog.loading = true;
+                GetPaasAppDeployLog({ id: this.buildLog.appId }).then(res => {
+                    this.buildLog.status = res.status;
+                    this.buildLog.content = res.log || '';
+                    this.buildLog.loading = false;
+                    // 日志滚到底部
+                    this.$nextTick(() => {
+                        const pre = this.$refs.buildLogPre;
+                        if (pre && pre.parentElement) pre.parentElement.scrollTop = pre.parentElement.scrollHeight;
+                    });
+                    if (this.buildLog.status !== 3) this.stopBuildLogPoll();
+                }).catch(() => {
+                    this.buildLog.loading = false;
+                    if (manual !== true) this.stopBuildLogPoll();
+                });
+            },
+            startBuildLogPoll () {
+                this.stopBuildLogPoll();
+                this.buildLog.timer = setInterval(() => {
+                    if (this.buildLog.show && this.buildLog.status === 3) this.loadBuildLog();
+                    else this.stopBuildLogPoll();
+                }, 2000);
+            },
+            stopBuildLogPoll () {
+                if (this.buildLog.timer) {
+                    clearInterval(this.buildLog.timer);
+                    this.buildLog.timer = null;
+                }
             },
             handleLogs (row) {
                 this.logs.appName = row.name;
@@ -412,6 +474,7 @@
         },
         beforeUnmount () {
             if (this.pollTimer) clearInterval(this.pollTimer);
+            this.stopBuildLogPoll();
         }
     };
 </script>

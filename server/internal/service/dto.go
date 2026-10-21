@@ -202,6 +202,7 @@ type PaasAppDTO struct {
 	ContainerID     string   `json:"container_id"`
 	Status          int      `json:"status"`
 	LastError       string   `json:"last_error"`
+	DeployLog       string   `json:"deploy_log"`
 	CreatedAt       string   `json:"created_at"`
 }
 

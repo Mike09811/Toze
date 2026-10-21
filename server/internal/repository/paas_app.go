@@ -90,6 +90,15 @@ func (r *PaasAppRepository) UpdateStatus(id uint64, status int) error {
 	return r.db.Model(&model.PaasApp{}).Where("id = ?", id).Update("status", status).Error
 }
 
+// UpdateDeployLog 更新构建日志（截断保留最后一段，防止超大日志撑爆字段）。
+func (r *PaasAppRepository) UpdateDeployLog(id uint64, log string) error {
+	const max = 64 * 1024
+	if len(log) > max {
+		log = log[len(log)-max:]
+	}
+	return r.db.Model(&model.PaasApp{}).Where("id = ?", id).Update("deploy_log", log).Error
+}
+
 // UpdateDeployment 部署完成后回填容器与状态。
 func (r *PaasAppRepository) UpdateDeployment(id uint64, containerID string, status int, lastErr string) error {
 	return r.db.Model(&model.PaasApp{}).Where("id = ?", id).

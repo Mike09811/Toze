@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"io"
 	"log/slog"
 	"regexp"
 	"strconv"
@@ -19,6 +20,9 @@ import (
 
 // SSHExec 在纳管服务器上执行脚本；secret 为解密后的凭证明文，可注入替换以便测试。
 type SSHExec func(ctx context.Context, server *model.PaasServer, secret, script string) (string, error)
+
+// SSHExecStream 同 SSHExec，额外把实时输出写入 progress（构建日志直播用）。
+type SSHExecStream func(ctx context.Context, server *model.PaasServer, secret, script string, progress io.Writer) (string, error)
 
 // PaasListQuery PaaS 列表通用查询条件。
 type PaasListQuery struct {
@@ -59,6 +63,7 @@ type PaasService struct {
 	githubClientID     string
 	githubClientSecret string
 	exec               SSHExec
+	execStream         SSHExecStream
 }
 
 // NewPaasService 构造函数；aesKey 用于 SSH 凭证落库加密。
@@ -76,11 +81,15 @@ func NewPaasService(
 		githubClientID: githubClientID, githubClientSecret: githubClientSecret,
 	}
 	s.exec = defaultSSHExec
+	s.execStream = defaultSSHExecStream
 	return s
 }
 
 // SetExec 替换脚本执行器（测试注入用）。
 func (s *PaasService) SetExec(fn SSHExec) { s.exec = fn }
+
+// SetExecStream 替换流式脚本执行器（测试注入用）。
+func (s *PaasService) SetExecStream(fn SSHExecStream) { s.execStream = fn }
 
 // 默认脚本执行时长：部署/初始化走后台协程，给足镜像拉取时间。
 const (
@@ -91,6 +100,10 @@ const (
 
 func defaultSSHExec(ctx context.Context, server *model.PaasServer, secret, script string) (string, error) {
 	return sshx.NewRunner().Exec(ctx, server.IP, server.SSHPort, server.SSHUser, server.AuthType, secret, script)
+}
+
+func defaultSSHExecStream(ctx context.Context, server *model.PaasServer, secret, script string, progress io.Writer) (string, error) {
+	return sshx.NewRunner().ExecStream(ctx, server.IP, server.SSHPort, server.SSHUser, server.AuthType, secret, script, progress)
 }
 
 // run 解密凭证后在目标服务器上执行脚本。

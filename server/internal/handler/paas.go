@@ -60,7 +60,7 @@ type paasAppUpsertReq struct {
 	Image           string   `json:"image"`
 	SourceRepo      string   `json:"source_repo"`
 	SourceBranch    string   `json:"source_branch"`
-	SourceAccountID uint64   `json:"source_account_id"`
+	SourceAccountID string   `json:"source_account_id"`
 	ContainerPort   int      `json:"container_port"`
 	HostPort        int      `json:"host_port"`
 	Env             []string `json:"env"`
@@ -292,6 +292,25 @@ func (h *PaasHandler) appContainerAction(c *gin.Context, fn func(ctx context.Con
 	response.OKMsg(c, msg, gin.H{"msg": msg})
 }
 
+// AppDeployLog POST /api/paas/app/deploy-log 构建日志（部署中实时轮询）
+func (h *PaasHandler) AppDeployLog(c *gin.Context) {
+	var req deleteReq
+	if !bind(c, &req) {
+		return
+	}
+	id, err := service.ParseID(req.ID)
+	if err != nil {
+		response.FailErr(c, err)
+		return
+	}
+	dto, err := h.svc.AppDeployLog(id)
+	if err != nil {
+		response.FailErr(c, err)
+		return
+	}
+	response.OK(c, gin.H{"status": dto.Status, "log": dto.DeployLog})
+}
+
 // AppLogs POST /api/paas/app/logs
 func (h *PaasHandler) AppLogs(c *gin.Context) {
 	var req paasAppLogsReq
@@ -394,9 +413,10 @@ func toPaasServerUpsert(req paasServerUpsertReq) service.PaasServerUpsert {
 }
 
 func toPaasAppUpsert(req paasAppUpsertReq) service.PaasAppUpsert {
+	accountID, _ := service.ParseID(req.SourceAccountID)
 	return service.PaasAppUpsert{
 		ID: req.ID, ServerID: req.ServerID, Name: req.Name, Image: req.Image,
-		SourceRepo: req.SourceRepo, SourceBranch: req.SourceBranch, SourceAccountID: req.SourceAccountID,
+		SourceRepo: req.SourceRepo, SourceBranch: req.SourceBranch, SourceAccountID: accountID,
 		ContainerPort: req.ContainerPort, HostPort: req.HostPort,
 		Env: req.Env, Volumes: req.Volumes, Restart: req.Restart,
 	}

@@ -1,16 +1,20 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/Mike09811/Toze/server/internal/model"
 	"github.com/Mike09811/Toze/server/internal/pkg/errcode"
 	"github.com/Mike09811/Toze/server/internal/pkg/pagination"
+	"github.com/Mike09811/Toze/server/internal/pkg/secretbox"
 	"github.com/Mike09811/Toze/server/internal/pkg/sshx"
 	"github.com/Mike09811/Toze/server/internal/repository"
 )
@@ -69,6 +73,7 @@ func (s *PaasService) ListApps(q PaasAppQuery) ([]PaasAppDTO, int64, error) {
 	for i := range apps {
 		dto := ToPaasAppDTO(&apps[i])
 		dto.ServerName = serverNames[apps[i].ServerID]
+		dto.DeployLog = "" // 列表不回传构建日志，按需走 deploy-log 接口
 		out = append(out, dto)
 	}
 	return out, total, nil
@@ -204,7 +209,16 @@ func (s *PaasService) DeployApp(id uint64) error {
 	go func(app model.PaasApp, server model.PaasServer) {
 		ctx, cancel := context.WithTimeout(context.Background(), paasDeployTimeout)
 		defer cancel()
-		out, err := s.run(ctx, &server, script)
+
+		// 构建输出实时落库，前端轮询 deploy-log 即可看到进度
+		live := &paasLiveLog{appID: app.ID, apps: s.apps}
+		secret, err := secretbox.Decrypt(s.aesKey, server.AuthContent)
+		if err != nil {
+			_ = s.apps.UpdateDeployment(app.ID, "", model.PaasAppUndeployed, err.Error())
+			return
+		}
+		out, err := s.execStream(ctx, &server, secret, script, live)
+		live.flush() // 终态：把完整输出写库一次
 		if err != nil {
 			s.log.Error("部署失败", "app", app.Name, "error", err)
 			_ = s.apps.UpdateDeployment(app.ID, "", model.PaasAppUndeployed, err.Error())
@@ -222,6 +236,34 @@ func (s *PaasService) DeployApp(id uint64) error {
 		s.log.Info("部署完成", "app", app.Name, "container", cid)
 	}(*app, *srv)
 	return nil
+}
+
+// paasLiveLog 线程安全的构建日志缓冲：边写入边节流落库。
+type paasLiveLog struct {
+	mu     sync.Mutex
+	buf    bytes.Buffer
+	appID  uint64
+	apps   *repository.PaasAppRepository
+	lastAt time.Time
+}
+
+func (l *paasLiveLog) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	n, err := l.buf.Write(p)
+	// 节流：每 2 秒落库一次
+	if time.Since(l.lastAt) > 2*time.Second {
+		l.lastAt = time.Now()
+		go l.apps.UpdateDeployLog(l.appID, l.buf.String())
+	}
+	return n, err
+}
+
+// flush 结束时同步写全量。
+func (l *paasLiveLog) flush() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	_ = l.apps.UpdateDeployLog(l.appID, l.buf.String())
 }
 
 // buildDeployScript 拼接部署脚本，所有动态值均单引号包裹。
@@ -306,6 +348,16 @@ func (s *PaasService) containerAction(ctx context.Context, id uint64, action str
 		return errcode.Newf(errcode.PaasSSHFailed, "执行 docker %s 失败: %v", action, err)
 	}
 	return s.apps.UpdateStatus(id, status)
+}
+
+// AppDeployLog 查看最近一次构建日志。
+func (s *PaasService) AppDeployLog(id uint64) (*PaasAppDTO, error) {
+	app, err := s.loadApp(id)
+	if err != nil {
+		return nil, err
+	}
+	dto := ToPaasAppDTO(app)
+	return &dto, nil
 }
 
 // AppLogs 查看容器最近日志。

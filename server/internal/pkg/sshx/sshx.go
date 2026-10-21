@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"strings"
 	"time"
@@ -30,6 +31,11 @@ func NewRunner() *Runner { return &Runner{DialTimeout: 10 * time.Second} }
 
 // Exec 在服务器上执行脚本，返回标准输出；失败时错误信息携带 stderr 摘要。
 func (r *Runner) Exec(ctx context.Context, host string, port int, user string, authType int, secret, script string) (string, error) {
+	return r.ExecStream(ctx, host, port, user, authType, secret, script, nil)
+}
+
+// ExecStream 同 Exec，并把 stdout / stderr 实时写入 progress（用于构建日志直播）。
+func (r *Runner) ExecStream(ctx context.Context, host string, port int, user string, authType int, secret, script string, progress io.Writer) (string, error) {
 	auth, err := buildAuth(authType, secret)
 	if err != nil {
 		return "", err
@@ -65,8 +71,13 @@ func (r *Runner) Exec(ctx context.Context, host string, port int, user string, a
 
 	var stdout, stderr bytes.Buffer
 	session.Stdin = strings.NewReader(script)
-	session.Stdout = &stdout
-	session.Stderr = &stderr
+	if progress != nil {
+		session.Stdout = io.MultiWriter(&stdout, progress)
+		session.Stderr = io.MultiWriter(&stderr, progress)
+	} else {
+		session.Stdout = &stdout
+		session.Stderr = &stderr
+	}
 	if err := session.Start("bash -s"); err != nil {
 		return "", fmt.Errorf("启动远程执行失败: %w", err)
 	}

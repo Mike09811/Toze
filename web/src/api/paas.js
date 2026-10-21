@@ -199,3 +199,11 @@ export function DeletePaasGitHubAccount (data) {
         data
     });
 }
+
+export function GetPaasAppDeployLog (data) {
+    return request({
+        url: '/api/paas/app/deploy-log',
+        method: 'post',
+        data
+    });
+}
