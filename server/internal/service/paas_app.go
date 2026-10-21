@@ -565,6 +565,7 @@ func ToPaasAppDTO(a *model.PaasApp) PaasAppDTO {
 		ContainerID:     a.ContainerID,
 		Status:          a.Status,
 		LastError:       a.LastError,
+		DeployLog:       a.DeployLog,
 		CreatedAt:       formatTime(a.CreatedAt),
 	}
 }

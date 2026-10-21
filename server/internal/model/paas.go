@@ -60,6 +60,7 @@ type PaasApp struct {
 	ContainerID     string    `gorm:"size:64"`
 	Status          int       `gorm:"default:0;index"` // 0-未部署 1-运行中 2-已停止 3-部署中
 	LastError       string    `gorm:"type:text"`
+	DeployLog       string    `gorm:"type:text"` // 最近一次部署/构建的实时输出
 	CreatedAt       time.Time `gorm:"index"`
 	UpdatedAt       time.Time
 }
