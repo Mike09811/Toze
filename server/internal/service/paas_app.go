@@ -373,8 +373,8 @@ func (s *PaasService) AppLogs(ctx context.Context, id uint64, tail int) (string,
 	if err != nil {
 		return "", err
 	}
-	if tail <= 0 || tail > 2000 {
-		tail = 200
+	if tail <= 0 || tail > 5000 {
+		tail = 1000
 	}
 	logCtx, cancel := context.WithTimeout(ctx, paasQuickTimeout)
 	defer cancel()

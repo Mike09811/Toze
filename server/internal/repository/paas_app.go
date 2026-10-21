@@ -92,7 +92,7 @@ func (r *PaasAppRepository) UpdateStatus(id uint64, status int) error {
 
 // UpdateDeployLog 更新构建日志（截断保留最后一段，防止超大日志撑爆字段）。
 func (r *PaasAppRepository) UpdateDeployLog(id uint64, log string) error {
-	const max = 64 * 1024
+	const max = 4 << 20 // 4MB，mediumtext 上限内
 	if len(log) > max {
 		log = log[len(log)-max:]
 	}

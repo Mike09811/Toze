@@ -43,6 +43,16 @@ export default {
             component: () => import('@/pages/paas/domain')
         },
         {
+            path: 'app/detail/:id',
+            name: 'paas-app-detail',
+            hidden: true,
+            meta: {
+                ...meta,
+                title: '应用详情'
+            },
+            component: () => import('@/pages/paas/app/detail')
+        },
+        {
             path: 'setting',
             name: `${pre}setting`,
             meta: {
