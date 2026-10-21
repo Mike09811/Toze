@@ -253,13 +253,15 @@ var ansiPattern = regexp.MustCompile(`\x1b\[[0-9;?]*[A-Za-z]`)
 func (l *paasLiveLog) Write(p []byte) (int, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	n, err := l.buf.Write(ansiPattern.ReplaceAll(p, nil))
+	// 剥离 ANSI 后写入；按 io.Writer 契约必须返回 len(p)，
+	// 否则剥离导致 n < len(p) 会被 ssh 通道判定为 short write
+	_, _ = l.buf.Write(ansiPattern.ReplaceAll(p, nil))
 	// 节流：每 2 秒同步落库一次（避免异步竞态覆盖终态日志）
 	if time.Since(l.lastAt) > 2*time.Second {
 		l.lastAt = time.Now()
 		_ = l.apps.UpdateDeployLog(l.appID, l.buf.String())
 	}
-	return n, err
+	return len(p), nil
 }
 
 // flush 结束时同步写全量。
