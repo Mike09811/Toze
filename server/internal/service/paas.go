@@ -12,6 +12,7 @@ import (
 
 	"github.com/Mike09811/Toze/server/internal/model"
 	"github.com/Mike09811/Toze/server/internal/pkg/errcode"
+	"github.com/Mike09811/Toze/server/internal/pkg/githubx"
 	"github.com/Mike09811/Toze/server/internal/pkg/pagination"
 	"github.com/Mike09811/Toze/server/internal/pkg/secretbox"
 	"github.com/Mike09811/Toze/server/internal/pkg/sshx"
@@ -65,6 +66,8 @@ type PaasService struct {
 	webhookSecret      string
 	exec               SSHExec
 	execStream         SSHExecStream
+	// githubProbe 校验 GitHub token 是否有效（测试注入用，默认真实调用 /user）
+	githubProbe func(ctx context.Context, token string) error
 }
 
 // NewPaasService 构造函数；aesKey 用于 SSH 凭证落库加密。
@@ -84,6 +87,10 @@ func NewPaasService(
 	}
 	s.exec = defaultSSHExec
 	s.execStream = defaultSSHExecStream
+	s.githubProbe = func(ctx context.Context, token string) error {
+		_, err := githubx.User(ctx, token)
+		return err
+	}
 	return s
 }
 

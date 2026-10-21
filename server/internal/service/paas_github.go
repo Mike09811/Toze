@@ -111,7 +111,7 @@ func (s *PaasService) probeGitHubToken(ctx context.Context, account *model.PaasG
 	if err != nil {
 		return false, "令牌解密失败（PAAS_AES_KEY 变更过？），请删除账号后重新授权"
 	}
-	if _, err := githubx.User(ctx, plain); err != nil {
+	if err := s.githubProbe(ctx, plain); err != nil {
 		var se *githubx.StatusError
 		if errors.As(err, &se) && se.Status == 401 {
 			return false, "授权已失效（token 被 GitHub 吊销或撤销），请重新一键授权"

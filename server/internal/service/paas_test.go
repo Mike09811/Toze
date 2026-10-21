@@ -395,6 +395,8 @@ func TestPaasGitHubBuildScript(t *testing.T) {
 
 func TestPaasGitHubAccounts(t *testing.T) {
 	svc, _, _ := newPaasTestService(t)
+	// 状态接口会实时探测 token，单元测试注入固定成功结果，避免访问外网
+	svc.githubProbe = func(ctx context.Context, token string) error { return nil }
 	// 两个账号，第一个自动成为默认
 	for i, login := range []string{"alice", "bob"} {
 		encrypted, err := secretbox.Encrypt("test-aes-key", "token-"+login)
@@ -407,12 +409,15 @@ func TestPaasGitHubAccounts(t *testing.T) {
 			t.Fatalf("upsert: %v", err)
 		}
 	}
-	status, err := svc.GitHubStatus()
+	status, err := svc.GitHubStatus(context.Background())
 	if err != nil {
 		t.Fatalf("status: %v", err)
 	}
 	if len(status.Accounts) != 2 || status.Accounts[0].Login != "alice" || !status.Accounts[0].IsDefault {
 		t.Fatalf("账号列表或默认标记不正确: %+v", status.Accounts)
+	}
+	if !status.Accounts[0].TokenValid {
+		t.Fatalf("注入探测成功时账号应标记为有效: %+v", status.Accounts[0])
 	}
 
 	// 指定 bob 账号解析 token
