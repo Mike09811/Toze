@@ -58,11 +58,15 @@
                         <Tag v-else-if="buildStatus === 1" color="green">部署成功，运行中</Tag>
                         <Tag v-else-if="buildStatus === 0" color="red">未部署 / 上次构建失败</Tag>
                         <Tag v-else color="gray">已停止</Tag>
-                        <span class="page-paas-detail-meta">全量输出 {{ buildLogSize }} 字符</span>
-                        <Checkbox v-model="autoScroll" class="ivu-ml-16">自动滚动</Checkbox>
+                        <Checkbox v-model="onlyErrors">只看错误和阶段</Checkbox>
+                        <Checkbox v-model="autoScroll">自动滚动</Checkbox>
+                        <span class="page-paas-detail-meta">共 {{ buildLines.length }} 行{{ buildLines.length > renderLimit ? '，显示最后 ' + renderLimit + ' 行' : '' }}</span>
                         <Button size="small" icon="md-refresh" style="margin-left: auto;" @click="loadBuildLog">刷新</Button>
                     </div>
-                    <div class="page-paas-logs page-paas-detail-logs"><pre ref="buildPre">{{ buildLog || '暂无构建日志' }}</pre></div>
+                    <div class="page-paas-logs page-paas-detail-logs" ref="buildBox">
+                        <div v-if="!buildLines.length" class="page-paas-detail-empty">暂无构建日志</div>
+                        <div v-for="(line, i) in renderedBuildLines" :key="i" class="page-paas-logline" :class="'page-paas-logline-' + line.t">{{ line.s }}</div>
+                    </div>
                 </TabPane>
                 <TabPane label="运行日志" name="runtime">
                     <div class="page-paas-detail-toolbar">
@@ -74,7 +78,10 @@
                         <Checkbox v-model="autoScrollRuntime" class="ivu-ml-16">自动滚动</Checkbox>
                         <Button size="small" icon="md-refresh" style="margin-left: auto;" :loading="runtimeLoading" @click="loadRuntimeLog">刷新</Button>
                     </div>
-                    <div class="page-paas-logs page-paas-detail-logs"><pre ref="runtimePre">{{ runtimeLog || '暂无运行日志（应用需处于部署状态）' }}</pre></div>
+                    <div class="page-paas-logs page-paas-detail-logs" ref="runtimeBox">
+                        <div v-if="!runtimeLines.length" class="page-paas-detail-empty">暂无运行日志（应用需处于部署状态）</div>
+                        <div v-for="(line, i) in renderedRuntimeLines" :key="i" class="page-paas-logline" :class="'page-paas-logline-' + line.t">{{ line.s }}</div>
+                    </div>
                 </TabPane>
             </Tabs>
         </Card>
@@ -82,6 +89,23 @@
 </template>
 <script>
     import { GetPaasAppList, DeployPaasApp, GetPaasAppDeployLog, GetPaasAppLogs } from '@api/paas';
+
+// 日志行分类：error / warn / stage / plain
+const ERROR_RE = /(ERROR|error|Error|FAILED|failed:|failed to|exit code|未就绪|部署失败|!!!!|cannot find|No such|refused|denied)/;
+const WARN_RE = /(WARN|warn|warning|deprecat|retrying)/;
+const STAGE_RE = /^==== /;
+function classifyLogLines (log) {
+    const out = [];
+    for (const raw of log.split('\n')) {
+        if (!raw) continue;
+        let t = 'plain';
+        if (STAGE_RE.test(raw)) t = 'stage';
+        else if (ERROR_RE.test(raw)) t = 'error';
+        else if (WARN_RE.test(raw)) t = 'warn';
+        out.push({ s: raw, t });
+    }
+    return out;
+}
 
     export default {
         name: 'paas-app-detail',
@@ -97,12 +121,29 @@
                 runtimeTail: 1000,
                 runtimeLoading: false,
                 autoScroll: true,
-                autoScrollRuntime: true
+                autoScrollRuntime: true,
+                onlyErrors: false,
+                renderLimit: 3000
             };
         },
         computed: {
             buildLogSize () {
                 return (this.buildLog || '').length.toLocaleString();
+            },
+            buildLines () {
+                return classifyLogLines(this.buildLog || '');
+            },
+            runtimeLines () {
+                return classifyLogLines(this.runtimeLog || '');
+            },
+            renderedBuildLines () {
+                let lines = this.buildLines;
+                if (this.onlyErrors) lines = lines.filter(l => l.t !== 'plain');
+                return lines.length > this.renderLimit ? lines.slice(lines.length - this.renderLimit) : lines;
+            },
+            renderedRuntimeLines () {
+                const lines = this.runtimeLines;
+                return lines.length > this.renderLimit ? lines.slice(lines.length - this.renderLimit) : lines;
             },
             infoItems () {
                 const a = this.app || {};
@@ -139,7 +180,7 @@
                 GetPaasAppDeployLog({ id: this.appId }).then(res => {
                     this.buildStatus = res.status;
                     this.buildLog = res.log || '';
-                    this.scrollBottom('buildPre');
+                    this.scrollBottom('buildBox');
                     if (res.status !== 3) this.stopBuildPoll();
                 });
             },
@@ -162,16 +203,16 @@
                 GetPaasAppLogs({ id: this.appId, tail: this.runtimeTail }).then(res => {
                     this.runtimeLog = res.logs || '';
                     this.runtimeLoading = false;
-                    this.scrollBottom('runtimePre');
+                    this.scrollBottom('runtimeBox');
                 }).catch(() => {
                     this.runtimeLoading = false;
                 });
             },
             scrollBottom (ref) {
-                if (!(ref === 'buildPre' ? this.autoScroll : this.autoScrollRuntime)) return;
+                if (!(ref === 'buildBox' ? this.autoScroll : this.autoScrollRuntime)) return;
                 this.$nextTick(() => {
-                    const pre = this.$refs[ref];
-                    if (pre && pre.parentElement) pre.parentElement.scrollTop = pre.parentElement.scrollHeight;
+                    const box = this.$refs[ref];
+                    if (box) box.scrollTop = box.scrollHeight;
                 });
             },
             handleDeploy () {
@@ -205,6 +246,16 @@
         &-logs {
             height: calc(100vh - 320px);
             min-height: 320px;
+            padding: 8px 12px;
+            background: #17233d;
+            border-radius: 4px;
+            overflow: auto;
+            font-family: Menlo, Consolas, monospace;
+            font-size: 12px;
+            line-height: 1.7;
+        }
+        &-empty {
+            color: #808695;
         }
         &-toolbar {
             display: flex;
@@ -236,6 +287,27 @@
             padding: 1px 6px;
             background: #f5f7f9;
             border-radius: 3px;
+        }
+    }
+</style>
+<style lang="less">
+    .page-paas-logline {
+        white-space: pre-wrap;
+        word-break: break-all;
+        color: #c5c8ce;
+        &-error {
+            color: #ff7875;
+            font-weight: 600;
+        }
+        &-warn {
+            color: #ffc069;
+        }
+        &-stage {
+            color: #69c0ff;
+            font-weight: 700;
+            border-top: 1px dashed #364e6e;
+            margin-top: 6px;
+            padding-top: 6px;
         }
     }
 </style>

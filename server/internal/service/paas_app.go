@@ -247,10 +247,13 @@ type paasLiveLog struct {
 	lastAt time.Time
 }
 
+// ansiPattern 终端转义序列（颜色码等），落库前剥离避免日志乱码。
+var ansiPattern = regexp.MustCompile(`\x1b\[[0-9;?]*[A-Za-z]`)
+
 func (l *paasLiveLog) Write(p []byte) (int, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	n, err := l.buf.Write(p)
+	n, err := l.buf.Write(ansiPattern.ReplaceAll(p, nil))
 	// 节流：每 2 秒同步落库一次（避免异步竞态覆盖终态日志）
 	if time.Since(l.lastAt) > 2*time.Second {
 		l.lastAt = time.Now()
@@ -273,6 +276,8 @@ func (l *paasLiveLog) flush() {
 func (s *PaasService) buildDeployScript(app *model.PaasApp, githubToken string) string {
 	var b strings.Builder
 	b.WriteString("set -e\n")
+	// 任何一步失败都打上醒目终止标记，方便在日志里一眼定位
+	b.WriteString("trap 'echo \"!!!! 部署失败：上方最近的 error/failed 行即为原因\"' ERR\n")
 
 	image := app.Image
 	if app.SourceRepo != "" {
@@ -286,12 +291,14 @@ func (s *PaasService) buildDeployScript(app *model.PaasApp, githubToken string) 
 		}
 		image = "toze/" + app.Name + ":latest"
 		// 构建目录放登录用户家目录下，root / 普通用户都有写权限；应用名已过白名单校验
+		b.WriteString("echo ==== [1/4] 拉取代码（git clone）====\n")
 		b.WriteString("WORK=\"$HOME\"/toze/build/" + app.Name + "\n")
 		b.WriteString("rm -rf \"$WORK\" && mkdir -p \"$WORK\"\n")
 		b.WriteString("git clone --depth 1 -b " + sshx.Quote(branch) + " " + sshx.Quote(cloneURL) + " \"$WORK\"\n")
 		// 抹掉 remote 中的 token，避免明文留在服务器的 .git/config
 		b.WriteString("git -C \"$WORK\" remote remove origin\n")
 		b.WriteString("cd \"$WORK\"\n")
+		b.WriteString("echo ==== [2/4] 构建镜像（docker build）====\n")
 		b.WriteString("docker build --build-arg GOPROXY=https://goproxy.cn,direct -t " + sshx.Quote(image) + " .\n")
 	}
 
@@ -317,6 +324,7 @@ func (s *PaasService) buildDeployScript(app *model.PaasApp, githubToken string) 
 	}
 
 	nextName := app.Name + "-next"
+	b.WriteString("echo ==== [3/4] 启动新版本并等待就绪 ====\n")
 	b.WriteString("NEXT=" + sshx.Quote(nextName) + "\n")
 	b.WriteString("docker rm -f \"$NEXT\" >/dev/null 2>&1 || true\n")
 	// 随机挑一个可绑定的临时端口
@@ -334,16 +342,17 @@ func (s *PaasService) buildDeployScript(app *model.PaasApp, githubToken string) 
 	b.WriteString("    sleep 1\n")
 	b.WriteString("done\n")
 	b.WriteString("if [ \"$READY\" != 1 ]; then\n")
-	b.WriteString("    echo !! 新容器90秒内未就绪，保留旧版本不动。新容器日志：\n")
+	b.WriteString("    echo !!!! 新容器90秒内未就绪，旧版本保持服务不受影响。新容器日志：\n")
 	b.WriteString("    docker logs --tail 50 \"$NEXT\" 2>&1 || true\n")
 	b.WriteString("    docker rm -f \"$NEXT\" >/dev/null 2>&1 || true\n")
 	b.WriteString("    exit 1\n")
 	b.WriteString("fi\n")
-	b.WriteString("echo --> 新版本就绪，切换流量\n")
+	b.WriteString("echo ==== [4/4] 新版本就绪，切换流量 ====\n")
 	// 替换：镜像已验证并预热，正式容器秒级启动，业务中断约 1 秒以内
 	b.WriteString("docker rm -f " + sshx.Quote(app.Name) + " >/dev/null 2>&1 || true\n")
 	b.WriteString("cid=$(docker run -d --name " + sshx.Quote(app.Name) + runArgsNoPort() + portArg(strconv.Itoa(app.HostPort)) + imageArg + ")\n")
 	b.WriteString("docker rm -f \"$NEXT\" >/dev/null 2>&1 || true\n")
+	b.WriteString("echo ==== 部署完成，新版本运行中 ====\n")
 	b.WriteString("echo \"$cid\"\n")
 	return b.String()
 }
