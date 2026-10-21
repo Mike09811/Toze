@@ -305,9 +305,9 @@ func (s *PaasService) buildDeployScript(app *model.PaasApp, githubToken string) 
 		for _, v := range decodeJSONStrings(app.Volumes) {
 			r.WriteString(" -v " + sshx.Quote(v))
 		}
-		r.WriteString(" " + sshx.Quote(image))
 		return r.String()
 	}
+	imageArg := " " + sshx.Quote(image)
 	// -p 表达式；portExpr 为纯数字或 $P 形式的 shell 变量
 	portArg := func(portExpr string) string {
 		if strings.HasPrefix(portExpr, "$") {
@@ -322,7 +322,7 @@ func (s *PaasService) buildDeployScript(app *model.PaasApp, githubToken string) 
 	// 随机挑一个可绑定的临时端口
 	b.WriteString("TMP_PORT=\"\"\n")
 	b.WriteString("for P in $(shuf -i 20000-45000 -n 5); do\n")
-	b.WriteString("    if docker run -d --name \"$NEXT\"" + runArgsNoPort() + portArg("$P") + " >/dev/null 2>&1; then TMP_PORT=$P; break; fi\n")
+	b.WriteString("    if docker run -d --name \"$NEXT\"" + runArgsNoPort() + portArg("$P") + imageArg + " >/dev/null 2>&1; then TMP_PORT=$P; break; fi\n")
 	b.WriteString("    docker rm -f \"$NEXT\" >/dev/null 2>&1 || true\n")
 	b.WriteString("done\n")
 	b.WriteString("if [ -z \"$TMP_PORT\" ]; then echo 临时端口分配失败; exit 1; fi\n")
@@ -342,7 +342,7 @@ func (s *PaasService) buildDeployScript(app *model.PaasApp, githubToken string) 
 	b.WriteString("echo --> 新版本就绪，切换流量\n")
 	// 替换：镜像已验证并预热，正式容器秒级启动，业务中断约 1 秒以内
 	b.WriteString("docker rm -f " + sshx.Quote(app.Name) + " >/dev/null 2>&1 || true\n")
-	b.WriteString("cid=$(docker run -d --name " + sshx.Quote(app.Name) + runArgsNoPort() + portArg(strconv.Itoa(app.HostPort)) + ")\n")
+	b.WriteString("cid=$(docker run -d --name " + sshx.Quote(app.Name) + runArgsNoPort() + portArg(strconv.Itoa(app.HostPort)) + imageArg + ")\n")
 	b.WriteString("docker rm -f \"$NEXT\" >/dev/null 2>&1 || true\n")
 	b.WriteString("echo \"$cid\"\n")
 	return b.String()
