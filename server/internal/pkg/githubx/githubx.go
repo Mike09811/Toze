@@ -21,6 +21,16 @@ type Repo struct {
 	UpdatedAt     string `json:"updated_at"`
 }
 
+// StatusError GitHub API 非 2xx 响应，携带状态码供调用方区分失败原因。
+type StatusError struct {
+	Status int
+	Body   string
+}
+
+func (e *StatusError) Error() string {
+	return fmt.Sprintf("GitHub 返回 %d: %s", e.Status, truncate(e.Body, 200))
+}
+
 // AuthorizeURL 生成一键授权跳转地址。
 func AuthorizeURL(clientID string, scopes string) string {
 	return "https://github.com/login/oauth/authorize?client_id=" +
@@ -105,7 +115,7 @@ func api(ctx context.Context, token, path string, out any) error {
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("GitHub API 返回 %d: %s", resp.StatusCode, truncate(string(body), 200))
+		return &StatusError{Status: resp.StatusCode, Body: string(body)}
 	}
 	if err := json.Unmarshal(body, out); err != nil {
 		return fmt.Errorf("解析 GitHub API 响应失败: %w", err)
@@ -146,7 +156,7 @@ func CreateRepoWebhook(ctx context.Context, token, repo, callbackURL string) err
 	defer resp.Body.Close()
 	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusUnprocessableEntity {
-		return fmt.Errorf("GitHub 返回 %d: %s", resp.StatusCode, truncate(string(respBody), 200))
+		return &StatusError{Status: resp.StatusCode, Body: string(respBody)}
 	}
 	return nil
 }

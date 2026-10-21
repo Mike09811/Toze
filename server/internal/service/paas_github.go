@@ -17,7 +17,10 @@ type GitHubAccountDTO struct {
 	ID        string `json:"id"`
 	Login     string `json:"login"`
 	IsDefault bool   `json:"is_default"`
-	CreatedAt string `json:"created_at"`
+	// TokenValid 由状态接口实时探测：token 是否仍被 GitHub 接受。
+	TokenValid bool   `json:"token_valid"`
+	InvalidMsg string `json:"invalid_msg,omitempty"`
+	CreatedAt  string `json:"created_at"`
 }
 
 // GitHubStatusDTO 授权总览。
@@ -84,20 +87,60 @@ func (s *PaasService) GitHubCallback(ctx context.Context, code string) error {
 	return nil
 }
 
-// GitHubStatus 授权总览：账号列表 + OAuth 配置状态。
-func (s *PaasService) GitHubStatus() (*GitHubStatusDTO, error) {
+// GitHubStatus 授权总览：账号列表（实时校验 token 有效性）+ OAuth 配置状态。
+func (s *PaasService) GitHubStatus(ctx context.Context) (*GitHubStatusDTO, error) {
 	accounts, err := s.accounts.List()
 	if err != nil {
 		return nil, err
 	}
 	out := make([]GitHubAccountDTO, 0, len(accounts))
 	for i := range accounts {
-		out = append(out, ToGitHubAccountDTO(&accounts[i]))
+		dto := ToGitHubAccountDTO(&accounts[i])
+		dto.TokenValid, dto.InvalidMsg = s.probeGitHubToken(ctx, &accounts[i])
+		out = append(out, dto)
 	}
 	return &GitHubStatusDTO{
 		Accounts:        out,
 		OAuthConfigured: s.githubClientID != "" && s.githubClientSecret != "",
 	}, nil
+}
+
+// probeGitHubToken 实时探测账号 token 是否仍有效（一次 GET /user）。
+func (s *PaasService) probeGitHubToken(ctx context.Context, account *model.PaasGitHubAccount) (bool, string) {
+	plain, err := secretbox.Decrypt(s.aesKey, account.Token)
+	if err != nil {
+		return false, "令牌解密失败（PAAS_AES_KEY 变更过？），请删除账号后重新授权"
+	}
+	if _, err := githubx.User(ctx, plain); err != nil {
+		var se *githubx.StatusError
+		if errors.As(err, &se) && se.Status == 401 {
+			return false, "授权已失效（token 被 GitHub 吊销或撤销），请重新一键授权"
+		}
+		if errors.As(err, &se) && se.Status == 403 {
+			return false, "访问被 GitHub 拒绝（403），可能是限流，稍后重试"
+		}
+		return false, "GitHub 访问异常: " + err.Error()
+	}
+	return true, ""
+}
+
+// mapGitHubAPIError 把 GitHub API 错误翻译成用户可执行的提示。
+func mapGitHubAPIError(err error) error {
+	var se *githubx.StatusError
+	if errors.As(err, &se) {
+		switch se.Status {
+		case 401:
+			return errcode.New(errcode.Unauthorized,
+				"GitHub 授权已失效（token 被吊销或撤销），请到「系统设置 → GitHub 授权」重新一键授权")
+		case 403:
+			return errcode.New(errcode.Forbidden,
+				"GitHub 拒绝访问（403）：token 权限不足或触发限流，稍后重试")
+		case 404:
+			return errcode.New(errcode.NotFound,
+				"仓库不存在，或当前 GitHub 账号无权访问")
+		}
+	}
+	return err
 }
 
 // GitHubRepos 列出指定账号的仓库；accountID 为空时用默认账号。
@@ -108,7 +151,7 @@ func (s *PaasService) GitHubRepos(ctx context.Context, accountID uint64) ([]Repo
 	}
 	repos, err := githubx.ListRepos(ctx, token)
 	if err != nil {
-		return nil, errcode.Newf(errcode.Internal, "%v", err)
+		return nil, mapGitHubAPIError(err)
 	}
 	out := make([]RepoDTO, 0, len(repos))
 	for _, r := range repos {

@@ -23,9 +23,21 @@
             <Alert v-else-if="routeFromCallback" type="success" show-icon class="ivu-mb-16">
                 <template #desc>授权成功，账号已加入下方列表。</template>
             </Alert>
+            <Alert v-if="hasInvalidAccount" type="error" show-icon class="ivu-mb-16">
+                <template #desc>
+                    有 GitHub 授权已失效（token 被吊销或撤销），私有仓库构建与自动部署不可用。<br />
+                    请点击右上角「一键授权 GitHub」重新授权即可恢复，无需其他操作。
+                </template>
+            </Alert>
             <Table :columns="columns" :data="accounts" :loading="loading">
                 <template #default="{ row }">
                     <Tag v-if="row.is_default" color="green">默认</Tag>
+                </template>
+                <template #status="{ row }">
+                    <Tooltip :content="row.invalid_msg || 'token 可用'" placement="top">
+                        <Tag v-if="row.token_valid" color="blue">有效</Tag>
+                        <Tag v-else color="red">已失效</Tag>
+                    </Tooltip>
                 </template>
                 <template #action="{ row }">
                     <div>
@@ -69,6 +81,7 @@
                             attrs: { href: `https://github.com/${row.login}`, target: '_blank', rel: 'noopener' }
                         }, row.login) },
                     { title: '默认', slot: 'default', width: 90, align: 'center' },
+                    { title: 'Token 状态', slot: 'status', width: 110, align: 'center' },
                     { title: '授权时间', key: 'created_at', width: 180 },
                     { title: '操作', slot: 'action', width: 160, align: 'center' }
                 ],
@@ -89,6 +102,9 @@
             },
             routeFromCallback () {
                 return this.$route.query.github === 'ok';
+            },
+            hasInvalidAccount () {
+                return this.accounts.some(a => a.token_valid === false);
             }
         },
         methods: {

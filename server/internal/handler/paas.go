@@ -429,9 +429,9 @@ func toPaasAppUpsert(req paasAppUpsertReq) service.PaasAppUpsert {
 	}
 }
 
-// GitHubStatus POST /api/paas/github/status（账号列表 + 配置状态）
+// GitHubStatus POST /api/paas/github/status（账号列表 + 配置状态 + token 实时有效性）
 func (h *PaasHandler) GitHubStatus(c *gin.Context) {
-	dto, err := h.svc.GitHubStatus()
+	dto, err := h.svc.GitHubStatus(c.Request.Context())
 	if err != nil {
 		response.FailErr(c, err)
 		return

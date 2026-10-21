@@ -83,7 +83,11 @@ func (s *PaasService) GitHubSetupWebhook(ctx context.Context, repo, publicBaseUR
 	}
 	callback := strings.TrimRight(publicBaseURL, "/") + "/api/paas/github/webhook"
 	if err := githubx.CreateRepoWebhook(ctx, token, repo, callback); err != nil {
-		return errcode.Newf(errcode.Internal, "为 %s 配置 webhook 失败（需仓库管理员权限）: %v", repo, err)
+		if mapped := mapGitHubAPIError(err); mapped != err {
+			be := mapped.(*errcode.Error)
+			return errcode.Newf(be.Code, "为 %s 配置 webhook 失败：%s", repo, be.Msg)
+		}
+		return errcode.Newf(errcode.Internal, "为 %s 配置 webhook 失败: %v", repo, err)
 	}
 	s.log.Info("仓库 webhook 已配置", "repo", repo, "account", login, "callback", callback)
 	return nil
